@@ -40,6 +40,8 @@ class MongoApp:
         options_menu.add_command(label="3. Ver acreditaciones",
                                  command=lambda: self.open_viewer(self.coll_3))
         options_menu.add_separator()
+        options_menu.add_command(label="Consulta por orden", command=self.open_order_query)
+        options_menu.add_separator()
         options_menu.add_command(label="Exit", command=self.root.quit)
 
         asistente_menu = tk.Menu(menubar, tearoff=0)
@@ -126,6 +128,217 @@ class MongoApp:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load collection: {e}")
+
+    # ──────────────────────────────────────────────
+    #  CONSULTA POR ORDEN
+    # ──────────────────────────────────────────────
+    def open_order_query(self):
+        win = tk.Toplevel(self.root)
+        win.title("Consulta por Orden")
+        win.geometry("950x620")
+        win.resizable(True, True)
+
+        # ── Barra de búsqueda ──
+        search_frame = tk.Frame(win, pady=8)
+        search_frame.pack(fill=tk.X, padx=12)
+
+        tk.Label(search_frame, text="Número de orden:", font=("Arial", 11, "bold")).pack(side=tk.LEFT)
+
+        orden_var = tk.StringVar()
+        entrada = tk.Entry(search_frame, textvariable=orden_var, font=("Arial", 11), width=28)
+        entrada.pack(side=tk.LEFT, padx=(8, 6), ipady=3)
+
+        btn_buscar = tk.Button(search_frame, text="Buscar 🔍",
+                               font=("Arial", 10, "bold"),
+                               bg="#1a6eb5", fg="white",
+                               relief=tk.FLAT, padx=10)
+        btn_buscar.pack(side=tk.LEFT)
+
+        lbl_estado = tk.Label(search_frame, text="", font=("Arial", 9, "italic"), fg="#888888")
+        lbl_estado.pack(side=tk.LEFT, padx=(12, 0))
+
+        # ── Notebook con dos pestañas ──
+        notebook = ttk.Notebook(win)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=12, pady=(4, 12))
+
+        # Pestaña Órdenes
+        frame_orders = tk.Frame(notebook)
+        notebook.add(frame_orders, text="  Órdenes  ")
+
+        tree_orders_frame = tk.Frame(frame_orders)
+        tree_orders_frame.pack(fill=tk.BOTH, expand=True)
+
+        tree_orders = ttk.Treeview(tree_orders_frame, show='headings')
+        vsb_orders = ttk.Scrollbar(tree_orders_frame, orient="vertical", command=tree_orders.yview)
+        hsb_orders = ttk.Scrollbar(tree_orders_frame, orient="horizontal", command=tree_orders.xview)
+        tree_orders.configure(yscrollcommand=vsb_orders.set, xscrollcommand=hsb_orders.set)
+        tree_orders.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        vsb_orders.pack(side=tk.RIGHT, fill=tk.Y)
+        hsb_orders.pack(side=tk.BOTTOM, fill=tk.X)
+
+        lbl_no_orders = tk.Label(frame_orders, text="", font=("Arial", 10, "italic"), fg="#888888")
+        lbl_no_orders.pack(pady=4)
+
+        # Pestaña Piezas
+        frame_parts = tk.Frame(notebook)
+        notebook.add(frame_parts, text="  Piezas  ")
+
+        tree_parts_frame = tk.Frame(frame_parts)
+        tree_parts_frame.pack(fill=tk.BOTH, expand=True)
+
+        tree_parts = ttk.Treeview(tree_parts_frame, show='headings')
+        vsb_parts = ttk.Scrollbar(tree_parts_frame, orient="vertical", command=tree_parts.yview)
+        hsb_parts = ttk.Scrollbar(tree_parts_frame, orient="horizontal", command=tree_parts.xview)
+        tree_parts.configure(yscrollcommand=vsb_parts.set, xscrollcommand=hsb_parts.set)
+        tree_parts.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        vsb_parts.pack(side=tk.RIGHT, fill=tk.Y)
+        hsb_parts.pack(side=tk.BOTTOM, fill=tk.X)
+
+        lbl_no_parts = tk.Label(frame_parts, text="", font=("Arial", 10, "italic"), fg="#888888")
+        lbl_no_parts.pack(pady=4)
+
+        # Pestaña Reclamos
+        frame_claims = tk.Frame(notebook)
+        notebook.add(frame_claims, text="  Reclamos  ")
+
+        tree_claims_frame = tk.Frame(frame_claims)
+        tree_claims_frame.pack(fill=tk.BOTH, expand=True)
+
+        tree_claims = ttk.Treeview(tree_claims_frame, show='headings')
+        vsb_claims = ttk.Scrollbar(tree_claims_frame, orient="vertical", command=tree_claims.yview)
+        hsb_claims = ttk.Scrollbar(tree_claims_frame, orient="horizontal", command=tree_claims.xview)
+        tree_claims.configure(yscrollcommand=vsb_claims.set, xscrollcommand=hsb_claims.set)
+        tree_claims.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        vsb_claims.pack(side=tk.RIGHT, fill=tk.Y)
+        hsb_claims.pack(side=tk.BOTTOM, fill=tk.X)
+
+        lbl_no_claims = tk.Label(frame_claims, text="", font=("Arial", 10, "italic"), fg="#888888")
+        lbl_no_claims.pack(pady=4)
+
+        # ── Función auxiliar para poblar un Treeview ──
+        def _poblar_tree(tree, docs, lbl_vacio, nombre_col):
+            tree.delete(*tree.get_children())
+            lbl_vacio.config(text="")
+
+            if not docs:
+                lbl_vacio.config(text=f"No se encontraron {nombre_col} para esta orden.")
+                tree["columns"] = ()
+                return
+
+            exclude = {"_id", "source"}
+            columns = [k for k in docs[0].keys() if k not in exclude]
+            tree["columns"] = columns
+
+            for col in columns:
+                tree.heading(col, text=col.replace("_", " ").upper())
+                tree.column(col, width=150, minwidth=80)
+
+            for doc in docs:
+                row = []
+                for col in columns:
+                    val = doc.get(col, "")
+                    if col == "scanned_at" and val:
+                        val = str(val).split('T')[0].split(' ')[0]
+                    row.append(str(val))
+                tree.insert("", tk.END, values=row)
+
+        # ── Función auxiliar: construye query buscando en todos los campos string ──
+        def _build_query(collection, terms):
+            """
+            Inspecciona un documento de muestra de la colección para detectar
+            qué campos son strings, y arma un $or buscando cada term en todos ellos.
+            'terms' puede ser un string o una lista de strings.
+            Si no hay documentos o no hay campos string, devuelve None.
+            """
+            sample = collection.find_one()
+            if not sample:
+                return None
+            exclude = {"_id", "source"}
+            str_fields = [
+                k for k, v in sample.items()
+                if k not in exclude and isinstance(v, str)
+            ]
+            if not str_fields:
+                return None
+            if isinstance(terms, str):
+                terms = [terms]
+            return {"$or": [
+                {field: {"$regex": term, "$options": "i"}}
+                for field in str_fields
+                for term in terms
+            ]}
+
+        # ── Función principal de búsqueda ──
+        def buscar(event=None):
+            numero_orden = orden_var.get().strip()
+            if not numero_orden:
+                messagebox.showwarning("Campo vacío", "Ingresá un número de orden para buscar.")
+                return
+
+            lbl_estado.config(text="Buscando…", fg="#888888")
+            btn_buscar.config(state=tk.DISABLED)
+            win.update_idletasks()
+
+            try:
+                client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=2000)
+                db = client[self.db_name]
+
+                coll_orders = db[self.coll_1]
+                coll_parts  = db[self.coll_2]
+                coll_claims = db[self.coll_3]
+
+                query_orders = _build_query(coll_orders, numero_orden)
+                query_parts  = _build_query(coll_parts,  numero_orden)
+                # Transformación de prefijo para búsqueda en claims:
+                # 20xxxxx → 02xxxxx        (ej: 2012345 → 0212345)
+                # 60xxxxx → 26xxxxx        (ej: 6012345 → 2612345)
+                # 50xxxxx → 15xxxxx Y 05xxxxx (ej: 5012345 → 1512345 y 0512345)
+                if numero_orden.startswith("20"):
+                    numero_claims = "02" + numero_orden[2:]
+                elif numero_orden.startswith("60"):
+                    numero_claims = "26" + numero_orden[2:]
+                elif numero_orden.startswith("50"):
+                    numero_claims = ["15" + numero_orden[2:], "05" + numero_orden[2:]]
+                else:
+                    numero_claims = numero_orden
+                query_claims = _build_query(coll_claims, numero_claims)
+
+                orders_docs = list(coll_orders.find(query_orders)) if query_orders else []
+                parts_docs  = list(coll_parts.find(query_parts))   if query_parts  else []
+                claims_docs = list(coll_claims.find(query_claims)) if query_claims else []
+
+                total = len(orders_docs) + len(parts_docs) + len(claims_docs)
+                if total == 0:
+                    lbl_estado.config(text=f"Sin resultados para '{numero_orden}'.", fg="#c62828")
+                else:
+                    lbl_estado.config(
+                        text=(f"{len(orders_docs)} orden(es) · "
+                              f"{len(parts_docs)} pieza(s) · "
+                              f"{len(claims_docs)} reclamo(s) encontrados."),
+                        fg="#2e7d32"
+                    )
+
+                _poblar_tree(tree_orders, orders_docs, lbl_no_orders, "órdenes")
+                _poblar_tree(tree_parts,  parts_docs,  lbl_no_parts,  "piezas")
+                _poblar_tree(tree_claims, claims_docs, lbl_no_claims, "reclamos")
+
+                # Ir a la pestaña con resultados (prioriza órdenes)
+                if orders_docs:
+                    notebook.select(frame_orders)
+                elif parts_docs:
+                    notebook.select(frame_parts)
+                elif claims_docs:
+                    notebook.select(frame_claims)
+
+            except Exception as e:
+                lbl_estado.config(text="Error de conexión.", fg="#c62828")
+                messagebox.showerror("Error", f"No se pudo conectar a la base de datos:\n{e}")
+            finally:
+                btn_buscar.config(state=tk.NORMAL)
+
+        btn_buscar.config(command=buscar)
+        entrada.bind("<Return>", buscar)
+        entrada.focus()
 
     # ──────────────────────────────────────────────
     #  ASISTENTE DE GARANTÍA

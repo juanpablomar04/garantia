@@ -1,5 +1,8 @@
 import threading
+import math
+import re
 from pathlib import Path
+from collections import Counter
 
 SYSTEM_PROMPT = """
 Eres un asistente especializado en garantías de vehículos y autopartes, diseñado para ayudar a
@@ -32,8 +35,74 @@ cargados. Se recomienda escalar o consultar fuente adicional.
 - Nunca dar asesoramiento legal. Si se requiere, derivar al área legal.
 """
 
-# Carpeta donde se guardan los PDFs de garantía
-DOCS_FOLDER = Path(__file__).parent / "docs"
+# Límite de caracteres a enviar por consulta (~150k tokens de seguridad)
+MAX_CHARS = 150_000
+# Tamaño de cada fragmento en caracteres
+CHUNK_SIZE = 1_000
+# Cuántos fragmentos relevantes incluir
+TOP_K = 30
+
+
+def _tokenizar(texto: str) -> list[str]:
+    """Divide el texto en palabras en minúsculas."""
+    return re.findall(r'\w+', texto.lower())
+
+
+def _similitud_tf(fragmento: str, pregunta: str) -> float:
+    """
+    Calcula similitud simple entre fragmento y pregunta
+    usando frecuencia de términos compartidos (TF).
+    """
+    palabras_pregunta = set(_tokenizar(pregunta))
+    palabras_frag = _tokenizar(fragmento)
+    if not palabras_frag or not palabras_pregunta:
+        return 0.0
+    coincidencias = sum(1 for p in palabras_frag if p in palabras_pregunta)
+    return coincidencias / math.sqrt(len(palabras_frag))
+
+
+def _chunker(texto: str, chunk_size: int) -> list[str]:
+    """Divide el texto en fragmentos de tamaño aproximado."""
+    parrafos = texto.split('\n')
+    chunks = []
+    actual = ""
+    for parrafo in parrafos:
+        if len(actual) + len(parrafo) > chunk_size and actual:
+            chunks.append(actual.strip())
+            actual = parrafo
+        else:
+            actual += "\n" + parrafo
+    if actual.strip():
+        chunks.append(actual.strip())
+    return chunks
+
+
+def _recuperar_fragmentos(documentos: list[dict], pregunta: str,
+                           top_k: int, max_chars: int) -> str:
+    """
+    Busca los fragmentos más relevantes de todos los documentos
+    y los concatena respetando el límite de caracteres.
+    """
+    candidatos = []
+    for doc in documentos:
+        chunks = _chunker(doc["text"], CHUNK_SIZE)
+        for chunk in chunks:
+            score = _similitud_tf(chunk, pregunta)
+            candidatos.append((score, doc["filename"], chunk))
+
+    # Ordenar por relevancia descendente
+    candidatos.sort(key=lambda x: x[0], reverse=True)
+
+    resultado = ""
+    total_chars = 0
+    for score, filename, chunk in candidatos[:top_k]:
+        bloque = f"[{filename}]\n{chunk}\n\n"
+        if total_chars + len(bloque) > max_chars:
+            break
+        resultado += bloque
+        total_chars += len(bloque)
+
+    return resultado
 
 
 class WarrantyAssistant:
@@ -51,12 +120,13 @@ class WarrantyAssistant:
         except ImportError:
             raise ImportError("Instalá pypdf ejecutando: pip install pypdf")
 
-        DOCS_FOLDER.mkdir(exist_ok=True)
-        pdfs = list(DOCS_FOLDER.glob("*.pdf"))
+        docs_folder = Path(__file__).parent / "docs"
+        docs_folder.mkdir(exist_ok=True)
+        pdfs = list(docs_folder.glob("*.pdf"))
 
         if not pdfs:
             raise FileNotFoundError(
-                f"No se encontraron PDFs en la carpeta '{DOCS_FOLDER}'.\n"
+                f"No se encontraron PDFs en la carpeta '{docs_folder}'.\n"
                 "Copiá los documentos de garantía en esa carpeta y reiniciá el asistente."
             )
 
@@ -89,31 +159,29 @@ class WarrantyAssistant:
 
     def ask(self, question: str, on_response, on_error):
         """
-        Envía una pregunta a Claude en un hilo separado.
-        on_response(str): callback con la respuesta
-        on_error(str):    callback si hay un error
+        Envía una pregunta a Claude usando solo los fragmentos
+        más relevantes del documento (evita superar el límite de tokens).
         """
         def _run():
             try:
                 import anthropic
-                client = anthropic.Anthropic()  # usa ANTHROPIC_API_KEY del entorno
+                client = anthropic.Anthropic()
 
-                content = []
-                for doc in self.pdf_documents:
-                    content.append({
-                        "type": "text",
-                        "text": (
-                            f"=== DOCUMENTO: {doc['filename']} ===\n"
-                            f"{doc['text']}\n"
-                            f"=== FIN DE {doc['filename']} ===\n"
-                        )
-                    })
+                # Recuperar solo los fragmentos más relevantes
+                contexto = _recuperar_fragmentos(
+                    self.pdf_documents, question, TOP_K, MAX_CHARS
+                )
 
-                content.append({"type": "text", "text": question})
+                contenido_usuario = (
+                    f"Usá exclusivamente los siguientes fragmentos de los documentos "
+                    f"de garantía para responder la pregunta:\n\n"
+                    f"{contexto}\n\n"
+                    f"Pregunta: {question}"
+                )
 
                 self.conversation_history.append({
                     "role": "user",
-                    "content": content
+                    "content": contenido_usuario
                 })
 
                 response = client.messages.create(
