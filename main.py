@@ -49,7 +49,11 @@ class MongoApp:
         options_menu.add_separator()
         options_menu.add_command(label="Exit", command=self.root.quit)
 
+        dashboard_menu = tk.Menu(menubar, tearoff=0)
+        dashboard_menu.add_command(label="Abrir dashboard", command=self.open_dashboard)
+
         menubar.add_cascade(label="Inicio", menu=options_menu)
+        menubar.add_cascade(label="📊 Dashboard", menu=dashboard_menu)
 
         self.root.config(menu=menubar)
 
@@ -376,11 +380,18 @@ class MongoApp:
         win.resizable(False, False)
 
         DESVIOS = [
-            "Faltó revalidar",
-            "Sin Diss",
-            "Sin material",
+            "Revalidación no realizada",
+            "Diss faltante",
+            "Material faltante",
             "Material incorrecto",
-            "Vale sin firma/s",
+            "Vale de requisición sin firma/s",
+            "Vale de requisición faltante",
+            "Planilla de mantenimiento faltante",
+            "Planilla de mantenimiento sin firma/s",
+            "Descripción de la reparación incompleta/faltante",
+            "Diagnóstico incompleto/faltante",
+            
+            
         ]
 
         pad = {"padx": 16, "pady": (6, 0)}
@@ -445,6 +456,26 @@ class MongoApp:
             relief=tk.FLAT, padx=12, pady=4,
             command=guardar
         ).pack(pady=(4, 0))
+
+    # ──────────────────────────────────────────────
+    #  DASHBOARD MONGODB CHARTS
+    # ──────────────────────────────────────────────
+    def open_dashboard(self):
+        import subprocess, sys
+        from pathlib import Path
+
+        viewer = Path(__file__).parent / "dashboard_viewer.py"
+        if not viewer.exists():
+            messagebox.showerror(
+                "Archivo faltante",
+                f"No se encontró dashboard_viewer.py en:\n{viewer}"
+            )
+            return
+
+        subprocess.Popen(
+            [sys.executable, str(viewer)],
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        )
 
     # ──────────────────────────────────────────────
     #  ASISTENTE DE GARANTÍA
