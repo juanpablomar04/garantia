@@ -319,11 +319,11 @@ class MongoApp:
                 # 60xxxxx → 26xxxxx        (ej: 6012345 → 2612345)
                 # 50xxxxx → 15xxxxx Y 05xxxxx (ej: 5012345 → 1512345 y 0512345)
                 if numero_orden.startswith("20"):
-                    numero_claims = "02" + numero_orden[2:]
+                    numero_claims = "2" + numero_orden[2:]
                 elif numero_orden.startswith("60"):
                     numero_claims = "26" + numero_orden[2:]
                 elif numero_orden.startswith("50"):
-                    numero_claims = ["15" + numero_orden[2:], "05" + numero_orden[2:]]
+                    numero_claims = ["15" + numero_orden[2:], "5" + numero_orden[2:]]
                 else:
                     numero_claims = numero_orden
                 query_claims = _build_query(coll_claims, numero_claims)
@@ -380,18 +380,11 @@ class MongoApp:
         win.resizable(False, False)
 
         DESVIOS = [
-            "Revalidación no realizada",
-            "Diss faltante",
-            "Material faltante",
+            "Faltó revalidar",
+            "Sin Diss",
+            "Sin material",
             "Material incorrecto",
-            "Vale de requisición sin firma/s",
-            "Vale de requisición faltante",
-            "Planilla de mantenimiento faltante",
-            "Planilla de mantenimiento sin firma/s",
-            "Descripción de la reparación incompleta/faltante",
-            "Diagnóstico incompleto/faltante",
-            
-            
+            "Vale sin firma/s",
         ]
 
         pad = {"padx": 16, "pady": (6, 0)}
