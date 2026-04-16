@@ -22,6 +22,7 @@ class MongoApp:
         self.coll_2 = "parts"
         self.coll_3 = "claims"
         self.coll_4 = "faults"
+        self.coll_5 = "debts"
 
         # --- Asistente de garantía ---
         self.assistant = WarrantyAssistant()
@@ -43,16 +44,24 @@ class MongoApp:
                                  command=lambda: self.open_viewer(self.coll_3))
         options_menu.add_command(label="4. Ver desvíos",
                                  command=lambda: self.open_viewer(self.coll_4))
-        options_menu.add_separator()
-        options_menu.add_command(label="Consulta por orden", command=self.open_order_query)
-        options_menu.add_command(label="Ingresar desvío", command=self.open_fault_form)
+        options_menu.add_command(label="5. Ver débitos",
+                                 command=self.open_debts_viewer)
         options_menu.add_separator()
         options_menu.add_command(label="Exit", command=self.root.quit)
+
+        edit_menu = tk.Menu(menubar, tearoff=0)
+        edit_menu.add_command(label="Ingresar desvío", command=self.open_fault_form)
+        edit_menu.add_command(label="Ingresar débito", command=self.open_debt_form)
+
+        queries_menu = tk.Menu(menubar, tearoff=0)
+        queries_menu.add_command(label="Consulta por orden", command=self.open_order_query)
 
         dashboard_menu = tk.Menu(menubar, tearoff=0)
         dashboard_menu.add_command(label="Abrir dashboard", command=self.open_dashboard)
 
         menubar.add_cascade(label="Inicio", menu=options_menu)
+        menubar.add_cascade(label="Editar", menu=edit_menu)
+        menubar.add_cascade(label="Consultas", menu=queries_menu)
         menubar.add_cascade(label="📊 Dashboard", menu=dashboard_menu)
 
         self.root.config(menu=menubar)
@@ -119,6 +128,92 @@ class MongoApp:
 
                 lbl = tk.Label(filter_frame, text=col, font=("Arial", 8, "bold"))
                 lbl.grid(row=0, column=i, padx=5, sticky='w')
+
+                v = tk.StringVar()
+                v.trace_add("write", apply_filters)
+                ent = tk.Entry(filter_frame, textvariable=v, width=15)
+                ent.grid(row=1, column=i, padx=5, pady=2)
+                filter_vars[col] = v
+
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+            apply_filters()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load collection: {e}")
+
+    # ──────────────────────────────────────────────
+    #  VISOR DE DÉBITOS (debts, desde 2026, fecha sin hora)
+    # ──────────────────────────────────────────────
+    def open_debts_viewer(self):
+        try:
+            client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=2000)
+            db = client[self.db_name]
+            coll = db[self.coll_5]
+
+            raw_docs = list(coll.find({"fecha": {"$gte": datetime(2026, 1, 1)}}))
+            if not raw_docs:
+                messagebox.showwarning("Sin datos", "No hay débitos a partir del año 2026.")
+                return
+
+            exclude = {"_id", "source"}
+            date_cols = {"fecha", "date", "fecha_alta", "created_at"}
+            columns = [k for k in raw_docs[0].keys() if k not in exclude]
+
+            processed_data = []
+            for doc in raw_docs:
+                row = []
+                for col in columns:
+                    val = doc.get(col, "")
+                    if col in date_cols and val:
+                        try:
+                            if hasattr(val, "strftime"):
+                                val = val.strftime("%Y-%m-%d")
+                            else:
+                                val = str(val).split("T")[0].split(" ")[0]
+                        except Exception:
+                            val = str(val)
+                    else:
+                        val = str(val)
+                    row.append(val)
+                processed_data.append(row)
+
+            view_win = tk.Toplevel(self.root)
+            view_win.title("Ver débitos (desde 2026)")
+            view_win.geometry("900x500")
+
+            filter_frame = tk.Frame(view_win)
+            filter_frame.pack(fill=tk.X, padx=10, pady=5)
+
+            filter_vars = {}
+
+            tree_frame = tk.Frame(view_win)
+            tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+            tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
+            vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+            tree.configure(yscrollcommand=vsb.set)
+
+            def apply_filters(*args):
+                for item in tree.get_children():
+                    tree.delete(item)
+                for row in processed_data:
+                    match = True
+                    for i, col in enumerate(columns):
+                        f_val = filter_vars[col].get().lower()
+                        if f_val and f_val not in row[i].lower():
+                            match = False
+                            break
+                    if match:
+                        tree.insert("", tk.END, values=row)
+
+            for i, col in enumerate(columns):
+                tree.heading(col, text=col.replace("_", " ").upper())
+                tree.column(col, width=140)
+
+                lbl = tk.Label(filter_frame, text=col, font=("Arial", 8, "bold"))
+                lbl.grid(row=0, column=i, padx=5, sticky="w")
 
                 v = tk.StringVar()
                 v.trace_add("write", apply_filters)
@@ -444,6 +539,154 @@ class MongoApp:
 
         tk.Button(
             win, text="Guardar desvío",
+            font=("Arial", 10, "bold"),
+            bg="#1a6eb5", fg="white",
+            relief=tk.FLAT, padx=12, pady=4,
+            command=guardar
+        ).pack(pady=(4, 0))
+
+    # ──────────────────────────────────────────────
+    #  INGRESAR DÉBITO
+    # ──────────────────────────────────────────────
+    def open_debt_form(self):
+        from decimal import Decimal, InvalidOperation
+        from bson.decimal128 import Decimal128
+
+        win = tk.Toplevel(self.root)
+        win.title("Ingresar Débito")
+        win.geometry("520x580")
+        win.resizable(False, False)
+
+        pad = {"padx": 16, "pady": (5, 0)}
+
+        def make_label(text):
+            tk.Label(win, text=text, font=("Arial", 10, "bold"), anchor="w").pack(fill=tk.X, **pad)
+
+        def make_entry(var):
+            tk.Entry(win, textvariable=var, font=("Arial", 11)).pack(fill=tk.X, padx=16, ipady=2)
+            return var
+
+        # ── Campos ──
+        make_label("Orden *")
+        orden_var = make_entry(tk.StringVar())
+
+        make_label("Reparación")
+        reparacion_var = make_entry(tk.StringVar())
+
+        make_label("Motivo")
+        motivo_var = make_entry(tk.StringVar())
+
+        # Decimales en dos columnas
+        dec_frame = tk.Frame(win)
+        dec_frame.pack(fill=tk.X, padx=16, pady=(5, 0))
+
+        decimal_vars = {}
+        decimal_fields = [
+            ("MO",       "MO e"),
+            ("Material", "Material e"),
+        ]
+
+        for row_idx, (left, right) in enumerate(decimal_fields):
+            for col_idx, field in enumerate([left, right]):
+                tk.Label(dec_frame, text=field, font=("Arial", 10, "bold"), anchor="w").grid(
+                    row=row_idx * 2, column=col_idx, padx=(0 if col_idx == 0 else 10, 0), sticky="w")
+                v = tk.StringVar()
+                v.trace_add("write", lambda *_: actualizar_total())
+                tk.Entry(dec_frame, textvariable=v, font=("Arial", 11), width=18).grid(
+                    row=row_idx * 2 + 1, column=col_idx, padx=(0 if col_idx == 0 else 10, 0), sticky="ew", ipady=2)
+                decimal_vars[field] = v
+        dec_frame.columnconfigure(0, weight=1)
+        dec_frame.columnconfigure(1, weight=1)
+
+        # Total calculado (solo lectura)
+        total_frame = tk.Frame(win)
+        total_frame.pack(fill=tk.X, padx=16, pady=(6, 0))
+        tk.Label(total_frame, text="Total", font=("Arial", 10, "bold"), anchor="w").pack(side=tk.LEFT)
+        lbl_total = tk.Label(total_frame, text="0.00", font=("Arial", 11), fg="#1a6eb5", anchor="w")
+        lbl_total.pack(side=tk.LEFT, padx=(8, 0))
+
+        def actualizar_total():
+            from decimal import Decimal, InvalidOperation
+            total = Decimal("0")
+            for v in decimal_vars.values():
+                raw = v.get().strip().replace(",", ".")
+                try:
+                    total += Decimal(raw) if raw else Decimal("0")
+                except InvalidOperation:
+                    pass
+            lbl_total.config(text=str(total.quantize(Decimal("0.01"))))
+
+        make_label("Observación")
+        obs_txt = tk.Text(win, font=("Arial", 11), height=3, relief=tk.SUNKEN)
+        obs_txt.pack(fill=tk.X, padx=16, pady=(0, 4))
+
+        lbl_feedback = tk.Label(win, text="", font=("Arial", 9, "italic"))
+        lbl_feedback.pack(pady=(2, 0))
+
+        def guardar():
+            orden = orden_var.get().strip()
+            if not orden:
+                messagebox.showwarning("Campo requerido", "El campo Orden es obligatorio.", parent=win)
+                return
+
+            if not any(v.get().strip() for v in decimal_vars.values()):
+                messagebox.showwarning("Campo requerido", "Ingresá al menos un valor decimal (MO, MO e, Material o Material e).", parent=win)
+                return
+
+            # Parsear decimales
+            def to_decimal128(val_str):
+                v = val_str.strip().replace(",", ".")
+                if not v:
+                    return Decimal128("0")
+                try:
+                    return Decimal128(str(Decimal(v)))
+                except InvalidOperation:
+                    raise ValueError(f"Valor decimal inválido: '{val_str}'")
+
+            try:
+                mo       = to_decimal128(decimal_vars["MO"].get())
+                mo_e     = to_decimal128(decimal_vars["MO e"].get())
+                material = to_decimal128(decimal_vars["Material"].get())
+                mat_e    = to_decimal128(decimal_vars["Material e"].get())
+                total    = Decimal128(str(
+                    Decimal(mo.to_decimal()) +
+                    Decimal(mo_e.to_decimal()) +
+                    Decimal(material.to_decimal()) +
+                    Decimal(mat_e.to_decimal())
+                ))
+                doc = {
+                    "orden":       orden,
+                    "fecha":       datetime.now(),
+                    "reparacion":  reparacion_var.get().strip(),
+                    "motivo":      motivo_var.get().strip(),
+                    "MO":          mo,
+                    "MO_e":        mo_e,
+                    "Material":    material,
+                    "Material_e":  mat_e,
+                    "Total":       total,
+                    "observacion": obs_txt.get("1.0", tk.END).strip(),
+                }
+            except ValueError as e:
+                messagebox.showerror("Error de formato", str(e), parent=win)
+                return
+
+            try:
+                client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=2000)
+                db = client[self.db_name]
+                db[self.coll_5].insert_one(doc)
+                lbl_feedback.config(text="✔ Débito guardado correctamente.", fg="#2e7d32")
+                orden_var.set("")
+                reparacion_var.set("")
+                motivo_var.set("")
+                for v in decimal_vars.values():
+                    v.set("")
+                lbl_total.config(text="0.00")
+                obs_txt.delete("1.0", tk.END)
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo guardar:\n{e}", parent=win)
+
+        tk.Button(
+            win, text="Guardar débito",
             font=("Arial", 10, "bold"),
             bg="#1a6eb5", fg="white",
             relief=tk.FLAT, padx=12, pady=4,
