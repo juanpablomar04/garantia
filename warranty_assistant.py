@@ -1,8 +1,5 @@
 import threading
-import math
-import re
 from pathlib import Path
-from collections import Counter
 
 SYSTEM_PROMPT = """
 Eres un asistente especializado en garantías de vehículos y autopartes, diseñado para ayudar a
@@ -35,84 +32,38 @@ cargados. Se recomienda escalar o consultar fuente adicional.
 - Nunca dar asesoramiento legal. Si se requiere, derivar al área legal.
 """
 
-# Límite de caracteres a enviar por consulta (~150k tokens de seguridad)
+# Límite de caracteres del contexto de documentos enviado a Claude
 MAX_CHARS = 150_000
-# Tamaño de cada fragmento en caracteres
-CHUNK_SIZE = 1_000
-# Cuántos fragmentos relevantes incluir
-TOP_K = 30
+# Ventana deslizante del historial de conversación (número de mensajes)
+MAX_HISTORY = 20
 
 
-def _tokenizar(texto: str) -> list[str]:
-    """Divide el texto en palabras en minúsculas."""
-    return re.findall(r'\w+', texto.lower())
-
-
-def _similitud_tf(fragmento: str, pregunta: str) -> float:
-    """
-    Calcula similitud simple entre fragmento y pregunta
-    usando frecuencia de términos compartidos (TF).
-    """
-    palabras_pregunta = set(_tokenizar(pregunta))
-    palabras_frag = _tokenizar(fragmento)
-    if not palabras_frag or not palabras_pregunta:
-        return 0.0
-    coincidencias = sum(1 for p in palabras_frag if p in palabras_pregunta)
-    return coincidencias / math.sqrt(len(palabras_frag))
-
-
-def _chunker(texto: str, chunk_size: int) -> list[str]:
-    """Divide el texto en fragmentos de tamaño aproximado."""
-    parrafos = texto.split('\n')
-    chunks = []
-    actual = ""
-    for parrafo in parrafos:
-        if len(actual) + len(parrafo) > chunk_size and actual:
-            chunks.append(actual.strip())
-            actual = parrafo
-        else:
-            actual += "\n" + parrafo
-    if actual.strip():
-        chunks.append(actual.strip())
-    return chunks
-
-
-def _recuperar_fragmentos(documentos: list[dict], pregunta: str,
-                           top_k: int, max_chars: int) -> str:
-    """
-    Busca los fragmentos más relevantes de todos los documentos
-    y los concatena respetando el límite de caracteres.
-    """
-    candidatos = []
-    for doc in documentos:
-        chunks = _chunker(doc["text"], CHUNK_SIZE)
-        for chunk in chunks:
-            score = _similitud_tf(chunk, pregunta)
-            candidatos.append((score, doc["filename"], chunk))
-
-    # Ordenar por relevancia descendente
-    candidatos.sort(key=lambda x: x[0], reverse=True)
-
+def _build_context(documentos: list[dict], max_chars: int) -> str:
+    """Concatena el texto de todos los documentos respetando el límite de caracteres."""
     resultado = ""
-    total_chars = 0
-    for score, filename, chunk in candidatos[:top_k]:
-        bloque = f"[{filename}]\n{chunk}\n\n"
-        if total_chars + len(bloque) > max_chars:
+    for doc in documentos:
+        bloque = f"=== {doc['filename']} ===\n{doc['text']}\n\n"
+        if len(resultado) + len(bloque) > max_chars:
+            remaining = max_chars - len(resultado)
+            if remaining > 100:
+                resultado += bloque[:remaining]
             break
         resultado += bloque
-        total_chars += len(bloque)
-
     return resultado
 
 
 class WarrantyAssistant:
     def __init__(self):
-        self.pdf_documents = []        # lista de {filename, text}
-        self.conversation_history = [] # historial del chat
+        self.pdf_documents: list[dict] = []
+        self.conversation_history: list[dict] = []
+
+    @property
+    def docs_loaded(self) -> bool:
+        return bool(self.pdf_documents)
 
     def load_all_pdfs(self) -> list[str]:
         """
-        Carga automáticamente todos los PDFs de la carpeta 'docs/'.
+        Carga todos los PDFs de la carpeta 'docs/'.
         Retorna lista de nombres de archivos cargados.
         """
         try:
@@ -126,23 +77,21 @@ class WarrantyAssistant:
 
         if not pdfs:
             raise FileNotFoundError(
-                f"No se encontraron PDFs en la carpeta '{docs_folder}'.\n"
+                f"No se encontraron PDFs en '{docs_folder}'.\n"
                 "Copiá los documentos de garantía en esa carpeta y reiniciá el asistente."
             )
 
+        nuevos_docs = []
         cargados = []
         for pdf_path in pdfs:
-            reader = PdfReader(str(pdf_path))
-            texto = ""
-            for page in reader.pages:
-                texto += page.extract_text() or ""
-
-            if texto.strip():
-                self.pdf_documents.append({
-                    "filename": pdf_path.name,
-                    "text": texto
-                })
-                cargados.append(pdf_path.name)
+            try:
+                reader = PdfReader(str(pdf_path))
+                texto = "".join(page.extract_text() or "" for page in reader.pages)
+                if texto.strip():
+                    nuevos_docs.append({"filename": pdf_path.name, "text": texto})
+                    cargados.append(pdf_path.name)
+            except Exception:
+                pass  # saltar PDFs ilegibles
 
         if not cargados:
             raise ValueError(
@@ -150,57 +99,61 @@ class WarrantyAssistant:
                 "Pueden estar escaneados como imagen."
             )
 
+        self.pdf_documents = nuevos_docs
         return cargados
 
+    def clear_history(self):
+        """Limpia solo el historial de conversación; mantiene los documentos en caché."""
+        self.conversation_history = []
+
     def clear(self):
-        """Limpia documentos e historial."""
+        """Limpia documentos e historial completos."""
         self.pdf_documents = []
         self.conversation_history = []
 
     def ask(self, question: str, on_response, on_error):
         """
-        Envía una pregunta a Claude usando solo los fragmentos
-        más relevantes del documento (evita superar el límite de tokens).
+        Envía una pregunta a Claude. El texto completo de los documentos se coloca en el
+        system prompt con cache_control=ephemeral, de modo que la API lo reutiliza entre
+        consultas consecutivas y reduce latencia y costo.
         """
         def _run():
             try:
                 import anthropic
                 client = anthropic.Anthropic()
 
-                # Recuperar solo los fragmentos más relevantes
-                contexto = _recuperar_fragmentos(
-                    self.pdf_documents, question, TOP_K, MAX_CHARS
-                )
+                full_context = _build_context(self.pdf_documents, MAX_CHARS)
 
-                contenido_usuario = (
-                    f"Usá exclusivamente los siguientes fragmentos de los documentos "
-                    f"de garantía para responder la pregunta:\n\n"
-                    f"{contexto}\n\n"
-                    f"Pregunta: {question}"
-                )
+                # El bloque de documentos se marca como cacheable; el system prompt base
+                # queda incluido en el mismo breakpoint de caché.
+                system = [
+                    {"type": "text", "text": SYSTEM_PROMPT},
+                    {
+                        "type": "text",
+                        "text": f"Documentos de garantía cargados:\n\n{full_context}",
+                        "cache_control": {"type": "ephemeral"},
+                    },
+                ]
 
-                self.conversation_history.append({
-                    "role": "user",
-                    "content": contenido_usuario
-                })
+                self.conversation_history.append({"role": "user", "content": question})
+                # Ventana deslizante: solo los últimos MAX_HISTORY mensajes
+                messages = self.conversation_history[-MAX_HISTORY:]
 
                 response = client.messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=1500,
-                    system=SYSTEM_PROMPT,
-                    messages=self.conversation_history
+                    model="claude-sonnet-4-6",
+                    max_tokens=2048,
+                    system=system,
+                    messages=messages,
                 )
 
                 answer = response.content[0].text
-
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": answer
-                })
-
+                self.conversation_history.append({"role": "assistant", "content": answer})
                 on_response(answer)
 
             except Exception as e:
+                # Revertir el turno fallido para no corromper el historial
+                if self.conversation_history and self.conversation_history[-1]["role"] == "user":
+                    self.conversation_history.pop()
                 on_error(str(e))
 
         threading.Thread(target=_run, daemon=True).start()

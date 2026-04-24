@@ -1,1 +1,6 @@
 .env
+.env.txt
+__pycache__/
+*.pyc
+*.pyo
+app.log
