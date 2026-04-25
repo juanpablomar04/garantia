@@ -1,13 +1,15 @@
 import os
 import csv
+import json
 import logging
 import threading
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
 from pymongo import MongoClient
-from warranty_assistant import WarrantyAssistant
 from dotenv import load_dotenv
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 load_dotenv()
 
@@ -39,7 +41,7 @@ class MongoApp:
         self.coll_5 = "debts"
 
         self._client = None
-        self.assistant = WarrantyAssistant()
+        self.coll_6 = "tasks"
 
         self.setup_menu()
         self._setup_status_bar()   # primero el status bar (queda abajo)
@@ -75,10 +77,12 @@ class MongoApp:
             ("🔩  Ver piezas",          lambda: self.open_viewer(self.coll_2), "#e3f2fd", "#1565c0"),
             ("✅  Ver acreditaciones",   lambda: self.open_viewer(self.coll_3), "#e3f2fd", "#1565c0"),
             ("⚠  Ver desvíos",          lambda: self.open_viewer(self.coll_4), "#fff3e0", "#e65100"),
-            ("💰  Ver débitos",         self.open_debts_viewer,                "#fff3e0", "#e65100"),
             ("🔍  Consulta por orden",  self.open_order_query,                 "#f3e5f5", "#6a1b9a"),
-            ("🤖  Asistente IA",        self.open_warranty_assistant,          "#e8f5e9", "#2e7d32"),
             ("📊  Dashboard",           self.open_dashboard,                   "#fce4ec", "#880e4f"),
+            ("📷  Lector de órdenes",   self.open_order_scanner,               "#e8f5e9", "#1b5e20"),
+            ("📷  Lector de piezas",    self.open_parts_scanner,               "#e8f5e9", "#1b5e20"),
+            ("🏷   Generar QR piezas",  self.open_qr_generator,                "#fbe9e7", "#bf360c"),
+            ("📝  Ver tareas",          self.open_tasks_viewer,                "#e8eaf6", "#283593"),
         ]
 
         for idx, (label, cmd, bg, fg) in enumerate(buttons):
@@ -140,12 +144,16 @@ class MongoApp:
                                  command=lambda: self.open_viewer(self.coll_4))
         options_menu.add_command(label="5. Ver débitos",
                                  command=self.open_debts_viewer)
+        options_menu.add_command(label="6. Ver tareas",
+                                 command=self.open_tasks_viewer)
         options_menu.add_separator()
         options_menu.add_command(label="Exit", command=self.root.quit)
 
         edit_menu = tk.Menu(menubar, tearoff=0)
         edit_menu.add_command(label="Ingresar desvío", command=self.open_fault_form)
         edit_menu.add_command(label="Ingresar débito", command=self.open_debt_form)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Generar QR piezas", command=self.open_qr_generator)
 
         queries_menu = tk.Menu(menubar, tearoff=0)
         queries_menu.add_command(label="Consulta por orden", command=self.open_order_query)
@@ -153,15 +161,10 @@ class MongoApp:
         dashboard_menu = tk.Menu(menubar, tearoff=0)
         dashboard_menu.add_command(label="Abrir dashboard", command=self.open_dashboard)
 
-        assistant_menu = tk.Menu(menubar, tearoff=0)
-        assistant_menu.add_command(label="Abrir asistente IA",
-                                   command=self.open_warranty_assistant)
-
         menubar.add_cascade(label="Inicio", menu=options_menu)
         menubar.add_cascade(label="Editar", menu=edit_menu)
         menubar.add_cascade(label="Consultas", menu=queries_menu)
         menubar.add_cascade(label="📊 Dashboard", menu=dashboard_menu)
-        menubar.add_cascade(label="🤖 Asistente", menu=assistant_menu)
 
         self.root.config(menu=menubar)
 
@@ -768,119 +771,684 @@ class MongoApp:
         )
 
     # ──────────────────────────────────────────────
-    #  ASISTENTE DE GARANTÍA
+    #  LECTOR DE ÓRDENES
     # ──────────────────────────────────────────────
-    def open_warranty_assistant(self):
+    def open_order_scanner(self):
         win = tk.Toplevel(self.root)
-        win.title("Asistente de Garantía — IA")
-        win.geometry("800x580")
+        win.title("Lector de Órdenes")
+        win.geometry("600x500")
         win.resizable(True, True)
 
-        self.assistant.clear_history()
-
-        tk.Label(win, text="Consultas al asistente", font=("Arial", 10, "bold")).pack(
-            anchor="w", padx=10, pady=(10, 2)
-        )
-
-        chat_area = scrolledtext.ScrolledText(
-            win, state=tk.DISABLED, wrap=tk.WORD,
-            font=("Arial", 10), bg="#fafafa", relief=tk.SUNKEN,
-        )
-        chat_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 6))
-
-        chat_area.tag_config("sistema",         foreground="#888888", font=("Arial", 9, "italic"))
-        chat_area.tag_config("agente_label",    foreground="#1a6eb5", font=("Arial", 10, "bold"))
-        chat_area.tag_config("agente_text",     foreground="#1a1a1a", font=("Arial", 10))
-        chat_area.tag_config("asistente_label", foreground="#2e7d32", font=("Arial", 10, "bold"))
-        chat_area.tag_config("asistente_text",  foreground="#1a1a1a", font=("Arial", 10))
-        chat_area.tag_config("error_label",     foreground="#c62828", font=("Arial", 10, "bold"))
-        chat_area.tag_config("separador",       foreground="#cccccc")
+        tk.Label(win, text="Lector de Órdenes",
+                 font=("Arial", 13, "bold"), fg="#1b5e20").pack(pady=(16, 2))
+        tk.Label(win, text="Escaneá o ingresá el código de orden y presioná Enter",
+                 font=("Arial", 9), fg="#555555").pack(pady=(0, 10))
 
         entry_frame = tk.Frame(win)
-        entry_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        entry_frame.pack(fill=tk.X, padx=16, pady=(0, 10))
 
-        entrada = tk.Entry(entry_frame, font=("Arial", 11))
-        entrada.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=4)
+        entrada = tk.Entry(entry_frame, font=("Arial", 13), relief=tk.SOLID, bd=1)
+        entrada.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=6)
 
-        btn_enviar = tk.Button(entry_frame, text="Consultar ▶",
-                               font=("Arial", 10, "bold"),
-                               bg="#2e7d32", fg="white",
-                               relief=tk.FLAT, padx=10)
-        btn_enviar.pack(side=tk.RIGHT, padx=(6, 0))
+        btn_scan = tk.Button(entry_frame, text="Registrar ▶",
+                             font=("Arial", 10, "bold"),
+                             bg="#1b5e20", fg="white", relief=tk.FLAT, padx=10)
+        btn_scan.pack(side=tk.RIGHT, padx=(8, 0))
 
-        def agregar_mensaje(remitente, texto):
-            chat_area.config(state=tk.NORMAL)
-            if remitente == "Sistema":
-                chat_area.insert(tk.END, f"ℹ {texto}\n", "sistema")
-            elif remitente == "Agente":
-                chat_area.insert(tk.END, "Agente: ", "agente_label")
-                chat_area.insert(tk.END, f"{texto}\n", "agente_text")
-            elif remitente == "Asistente":
-                chat_area.insert(tk.END, "Asistente: ", "asistente_label")
-                chat_area.insert(tk.END, f"{texto}\n", "asistente_text")
-            elif remitente == "Error":
-                chat_area.insert(tk.END, "⚠ Error: ", "error_label")
-                chat_area.insert(tk.END, f"{texto}\n", "agente_text")
-            chat_area.insert(tk.END, "─" * 60 + "\n", "separador")
-            chat_area.see(tk.END)
-            chat_area.config(state=tk.DISABLED)
+        log = scrolledtext.ScrolledText(win, state=tk.DISABLED, wrap=tk.WORD,
+                                        font=("Consolas", 10), bg="#f8f8f8", relief=tk.SUNKEN)
+        log.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 12))
+        log.tag_config("ok",   foreground="#2e7d32", font=("Consolas", 10, "bold"))
+        log.tag_config("dup",  foreground="#e65100", font=("Consolas", 10, "bold"))
+        log.tag_config("err",  foreground="#c62828", font=("Consolas", 10, "bold"))
+        log.tag_config("info", foreground="#555555", font=("Consolas", 9, "italic"))
 
-        def borrar_ultimo_mensaje():
-            chat_area.config(state=tk.NORMAL)
-            chat_area.delete("end-3l", tk.END)
-            chat_area.config(state=tk.DISABLED)
+        def _log(msg, tag="info"):
+            log.config(state=tk.NORMAL)
+            ts = datetime.now().strftime("%H:%M:%S")
+            log.insert(tk.END, f"[{ts}]  {msg}\n", tag)
+            log.see(tk.END)
+            log.config(state=tk.DISABLED)
 
-        def mostrar_respuesta(respuesta):
-            borrar_ultimo_mensaje()
-            agregar_mensaje("Asistente", respuesta)
-            btn_enviar.config(state=tk.NORMAL)
-            entrada.config(state=tk.NORMAL)
-            entrada.focus()
+        _log("Listo. Esperando escaneo…")
 
-        def mostrar_error(error):
-            borrar_ultimo_mensaje()
-            agregar_mensaje("Error", error)
-            btn_enviar.config(state=tk.NORMAL)
-            entrada.config(state=tk.NORMAL)
-
-        def enviar_pregunta(event=None):
-            pregunta = entrada.get().strip()
-            if not pregunta:
-                return
-            agregar_mensaje("Agente", pregunta)
+        def registrar(event=None):
+            codigo = entrada.get().strip()
             entrada.delete(0, tk.END)
-            btn_enviar.config(state=tk.DISABLED)
-            entrada.config(state=tk.DISABLED)
-            agregar_mensaje("Asistente", "Consultando documentos…")
+            if not codigo:
+                return
+            try:
+                db = self._get_db()
+                col = db[self.coll_1]
+                existing = col.find_one({"orden": codigo})
+                if existing:
+                    fecha = existing.get("scanned_at", "fecha desconocida")
+                    _log(f"DUPLICADO — '{codigo}' ya registrado el {fecha}", "dup")
+                else:
+                    col.insert_one({
+                        "orden": codigo,
+                        "scanned_at": datetime.now(),
+                        "source": "handheld_scanner",
+                    })
+                    _log(f"OK — Orden '{codigo}' registrada correctamente", "ok")
+            except Exception as e:
+                _log(f"ERROR — {e}", "err")
+            finally:
+                entrada.focus()
 
-            self.assistant.ask(
-                question=pregunta,
-                on_response=lambda r: win.after(0, mostrar_respuesta, r),
-                on_error=lambda e: win.after(0, mostrar_error, e),
-            )
+        btn_scan.config(command=registrar)
+        entrada.bind("<Return>", registrar)
+        win.after(100, entrada.focus)
 
-        btn_enviar.config(command=enviar_pregunta)
-        entrada.bind("<Return>", enviar_pregunta)
+    # ──────────────────────────────────────────────
+    #  LECTOR DE PIEZAS
+    # ──────────────────────────────────────────────
+    def open_parts_scanner(self):
+        win = tk.Toplevel(self.root)
+        win.title("Lector de Piezas")
+        win.geometry("640x520")
+        win.resizable(True, True)
 
-        def cargar_docs():
-            if self.assistant.docs_loaded:
-                nombres = ", ".join(d["filename"] for d in self.assistant.pdf_documents)
-                agregar_mensaje("Sistema", f"Documentos en caché: {nombres}")
-                agregar_mensaje("Sistema", "Listo para responder consultas.")
+        tk.Label(win, text="Lector de Piezas",
+                 font=("Arial", 13, "bold"), fg="#1b5e20").pack(pady=(16, 2))
+        tk.Label(win, text="Escaneá el código QR de la pieza y presioná Enter",
+                 font=("Arial", 9), fg="#555555").pack(pady=(0, 10))
+
+        entry_frame = tk.Frame(win)
+        entry_frame.pack(fill=tk.X, padx=16, pady=(0, 10))
+
+        entrada = tk.Entry(entry_frame, font=("Arial", 13), relief=tk.SOLID, bd=1)
+        entrada.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=6)
+
+        btn_scan = tk.Button(entry_frame, text="Registrar ▶",
+                             font=("Arial", 10, "bold"),
+                             bg="#1b5e20", fg="white", relief=tk.FLAT, padx=10)
+        btn_scan.pack(side=tk.RIGHT, padx=(8, 0))
+
+        log = scrolledtext.ScrolledText(win, state=tk.DISABLED, wrap=tk.WORD,
+                                        font=("Consolas", 10), bg="#f8f8f8", relief=tk.SUNKEN)
+        log.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 12))
+        log.tag_config("ok",   foreground="#2e7d32", font=("Consolas", 10, "bold"))
+        log.tag_config("dup",  foreground="#e65100", font=("Consolas", 10, "bold"))
+        log.tag_config("err",  foreground="#c62828", font=("Consolas", 10, "bold"))
+        log.tag_config("info", foreground="#555555", font=("Consolas", 9, "italic"))
+
+        def _log(msg, tag="info"):
+            log.config(state=tk.NORMAL)
+            ts = datetime.now().strftime("%H:%M:%S")
+            log.insert(tk.END, f"[{ts}]  {msg}\n", tag)
+            log.see(tk.END)
+            log.config(state=tk.DISABLED)
+
+        _log("Listo. Esperando escaneo… (JSON con campos: orden, pieza, cantidad)")
+
+        def registrar(event=None):
+            raw = entrada.get().strip()
+            entrada.delete(0, tk.END)
+            if not raw:
+                return
+            try:
+                data = json.loads(raw)
+                orden    = str(data["orden"])
+                pieza    = str(data["pieza"])
+                cantidad = data["cantidad"]
+            except (json.JSONDecodeError, KeyError) as e:
+                _log(f"ERROR — Formato inválido: {e}. Se esperaba JSON con orden/pieza/cantidad", "err")
                 entrada.focus()
                 return
             try:
-                cargados = self.assistant.load_all_pdfs()
-                nombres = ", ".join(cargados)
-                agregar_mensaje("Sistema", f"Documentos cargados: {nombres}")
-                agregar_mensaje("Sistema", "Listo para responder consultas.")
-                entrada.focus()
+                db = self._get_db()
+                col = db[self.coll_2]
+                existing = col.find_one({"orden": orden, "pieza": pieza, "cantidad": cantidad})
+                if existing:
+                    fecha = existing.get("scanned_at", "fecha desconocida")
+                    _log(
+                        f"DUPLICADO — Orden '{orden}' / Pieza '{pieza}' / "
+                        f"Cantidad '{cantidad}' ya registrado el {fecha}", "dup"
+                    )
+                else:
+                    col.insert_one({
+                        "orden": orden,
+                        "pieza": pieza,
+                        "cantidad": cantidad,
+                        "scanned_at": datetime.now(),
+                        "source": "handheld_scanner",
+                    })
+                    _log(f"OK — Pieza '{pieza}' (Orden: {orden} | Cant: {cantidad}) registrada", "ok")
             except Exception as e:
-                agregar_mensaje("Error", str(e))
-                btn_enviar.config(state=tk.DISABLED)
-                entrada.config(state=tk.DISABLED)
+                _log(f"ERROR — {e}", "err")
+            finally:
+                entrada.focus()
 
-        win.after(100, cargar_docs)
+        btn_scan.config(command=registrar)
+        entrada.bind("<Return>", registrar)
+        win.after(100, entrada.focus)
+
+    # ──────────────────────────────────────────────
+    #  GENERADOR DE QR DE PIEZAS
+    # ──────────────────────────────────────────────
+    def open_qr_generator(self):
+        try:
+            import qrcode as qrcode_lib
+            from PIL import Image, ImageDraw, ImageFont, ImageTk
+            from fpdf import FPDF
+        except ImportError as e:
+            messagebox.showerror(
+                "Dependencias faltantes",
+                f"Instalá los paquetes necesarios:\n  pip install qrcode Pillow fpdf2\n\nDetalle: {e}",
+            )
+            return
+
+        temp_dir = os.path.join(BASE_DIR, "temp_qr")
+        os.makedirs(temp_dir, exist_ok=True)
+        for f in os.listdir(temp_dir):
+            fp = os.path.join(temp_dir, f)
+            if os.path.isfile(fp):
+                try:
+                    os.remove(fp)
+                except Exception:
+                    pass
+
+        queue = []
+        preview_ref = [None]
+
+        win = tk.Toplevel(self.root)
+        win.title("Generador de QR de Piezas")
+        win.geometry("740x560")
+        win.resizable(True, True)
+
+        tk.Label(win, text="Generador de QR de Piezas",
+                 font=("Arial", 13, "bold"), fg="#bf360c").pack(pady=(14, 6))
+
+        main_frame = tk.Frame(win)
+        main_frame.pack(fill=tk.X, padx=16, pady=(0, 6))
+
+        # ── Formulario
+        form = tk.LabelFrame(main_frame, text="Nueva etiqueta",
+                             font=("Arial", 9), padx=12, pady=10)
+        form.pack(side=tk.LEFT, fill=tk.Y)
+
+        def _field(parent, label, row):
+            tk.Label(parent, text=label, font=("Arial", 10), anchor="w").grid(
+                row=row, column=0, sticky="w", pady=4)
+            e = tk.Entry(parent, font=("Arial", 11), width=18, relief=tk.SOLID, bd=1)
+            e.grid(row=row, column=1, padx=(8, 0), pady=4)
+            return e
+
+        entry_orden    = _field(form, "Orden:",    0)
+        entry_pieza    = _field(form, "Pieza:",    1)
+        entry_cantidad = _field(form, "Cantidad:", 2)
+
+        btn_agregar = tk.Button(form, text="Agregar QR ▶",
+                                font=("Arial", 10, "bold"),
+                                bg="#bf360c", fg="white", relief=tk.FLAT, pady=7, padx=12)
+        btn_agregar.grid(row=3, column=0, columnspan=2, pady=(12, 0), sticky="ew")
+
+        # ── Vista previa
+        preview_frame = tk.LabelFrame(main_frame, text="Vista previa",
+                                      font=("Arial", 9), padx=8, pady=8)
+        preview_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(14, 0))
+
+        preview_lbl = tk.Label(preview_frame, bg="#f0f0f0")
+        preview_lbl.pack(fill=tk.BOTH, expand=True)
+
+        # ── Cola
+        queue_frame = tk.LabelFrame(win, text="Cola de etiquetas",
+                                    font=("Arial", 9), padx=8, pady=4)
+        queue_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 6))
+
+        cols = ("num", "orden", "pieza", "cantidad")
+        tree = ttk.Treeview(queue_frame, columns=cols, show="headings", height=5)
+        tree.heading("num",      text="#")
+        tree.heading("orden",    text="Orden")
+        tree.heading("pieza",    text="Pieza")
+        tree.heading("cantidad", text="Cantidad")
+        tree.column("num",      width=40,  stretch=False)
+        tree.column("orden",    width=180)
+        tree.column("pieza",    width=180)
+        tree.column("cantidad", width=100)
+        vsb = ttk.Scrollbar(queue_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # ── Botones inferiores
+        btn_frame = tk.Frame(win)
+        btn_frame.pack(fill=tk.X, padx=16, pady=(0, 12))
+
+        lbl_count = tk.Label(btn_frame, text="0 etiquetas en cola",
+                             font=("Arial", 9), fg="#555555")
+        lbl_count.pack(side=tk.LEFT)
+
+        btn_pdf      = tk.Button(btn_frame, text="🖨  Generar PDF",
+                                 font=("Arial", 10, "bold"), bg="#1565c0", fg="white",
+                                 relief=tk.FLAT, padx=12, pady=4)
+        btn_eliminar = tk.Button(btn_frame, text="Eliminar seleccionado",
+                                 font=("Arial", 9), bg="#c62828", fg="white",
+                                 relief=tk.FLAT, padx=8)
+        btn_limpiar  = tk.Button(btn_frame, text="Limpiar todo",
+                                 font=("Arial", 9), bg="#757575", fg="white",
+                                 relief=tk.FLAT, padx=8)
+        btn_pdf.pack(side=tk.RIGHT, padx=(6, 0))
+        btn_eliminar.pack(side=tk.RIGHT, padx=(6, 0))
+        btn_limpiar.pack(side=tk.RIGHT, padx=(6, 0))
+
+        # ── Lógica
+        def _make_qr_image(orden, pieza, cantidad, path):
+            data_str = json.dumps({"orden": orden, "pieza": pieza, "cantidad": cantidad})
+            qr = qrcode_lib.QRCode(box_size=8, border=3)
+            qr.add_data(data_str)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+            w, h = qr_img.size
+            canvas = Image.new("RGB", (w, h + 70), "white")
+            canvas.paste(qr_img, (0, 0))
+            draw = ImageDraw.Draw(canvas)
+            try:
+                font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 18)
+            except Exception:
+                font = ImageFont.load_default()
+            for i, line in enumerate([f"Orden: {orden}", f"Pieza: {pieza}", f"Cant:  {cantidad}"]):
+                draw.text((20, h + 4 + i * 22), line, fill="black", font=font)
+            canvas.save(path)
+            return canvas
+
+        def _refresh():
+            for iid in tree.get_children():
+                tree.delete(iid)
+            for i, item in enumerate(queue, 1):
+                tree.insert("", tk.END, iid=str(i),
+                            values=(i, item["orden"], item["pieza"], item["cantidad"]))
+            n = len(queue)
+            lbl_count.config(text=f"{n} etiqueta{'s' if n != 1 else ''} en cola")
+
+        def agregar(event=None):
+            orden    = entry_orden.get().strip()
+            pieza    = entry_pieza.get().strip().upper()
+            cantidad = entry_cantidad.get().strip()
+            if not orden or not pieza or not cantidad:
+                messagebox.showwarning("Campos vacíos", "Completá todos los campos.", parent=win)
+                return
+            idx  = len(queue) + 1
+            path = os.path.join(temp_dir, f"{idx}.png")
+            try:
+                img = _make_qr_image(orden, pieza, cantidad, path)
+                queue.append({"orden": orden, "pieza": pieza, "cantidad": cantidad, "path": path})
+                thumb = img.copy()
+                thumb.thumbnail((170, 170))
+                photo = ImageTk.PhotoImage(thumb)
+                preview_ref[0] = photo
+                preview_lbl.config(image=photo)
+                _refresh()
+            except Exception as e:
+                messagebox.showerror("Error", str(e), parent=win)
+                return
+            entry_orden.delete(0, tk.END)
+            entry_pieza.delete(0, tk.END)
+            entry_cantidad.delete(0, tk.END)
+            entry_orden.focus()
+
+        def _rebuild_images():
+            for f in os.listdir(temp_dir):
+                fp = os.path.join(temp_dir, f)
+                if os.path.isfile(fp):
+                    try:
+                        os.remove(fp)
+                    except Exception:
+                        pass
+            for i, item in enumerate(queue, 1):
+                path = os.path.join(temp_dir, f"{i}.png")
+                _make_qr_image(item["orden"], item["pieza"], item["cantidad"], path)
+                item["path"] = path
+
+        def eliminar():
+            sel = tree.selection()
+            if not sel:
+                return
+            indices = {int(iid) - 1 for iid in sel}
+            queue[:] = [item for i, item in enumerate(queue) if i not in indices]
+            _rebuild_images()
+            if queue:
+                last = Image.open(queue[-1]["path"])
+                last.thumbnail((170, 170))
+                photo = ImageTk.PhotoImage(last)
+                preview_ref[0] = photo
+                preview_lbl.config(image=photo)
+            else:
+                preview_ref[0] = None
+                preview_lbl.config(image="")
+            _refresh()
+
+        def limpiar():
+            if not queue:
+                return
+            if not messagebox.askyesno("Confirmar", "¿Limpiar toda la cola?", parent=win):
+                return
+            queue.clear()
+            for f in os.listdir(temp_dir):
+                fp = os.path.join(temp_dir, f)
+                if os.path.isfile(fp):
+                    try:
+                        os.remove(fp)
+                    except Exception:
+                        pass
+            preview_ref[0] = None
+            preview_lbl.config(image="")
+            _refresh()
+
+        def generar_pdf():
+            if not queue:
+                messagebox.showwarning("Cola vacía", "Agregá al menos una etiqueta.", parent=win)
+                return
+            pdf_path = os.path.join(temp_dir, "etiquetas.pdf")
+            try:
+                pdf      = FPDF("P", "mm", "A4")
+                date_str = datetime.now().strftime("%d/%m/%Y")
+                W        = 210  # A4 width
+
+                # Fuente con soporte Unicode para caracteres acentuados
+                pdf.add_font("Arial",  style="",  fname="C:/Windows/Fonts/arial.ttf")
+                pdf.add_font("Arial",  style="B", fname="C:/Windows/Fonts/arialbd.ttf")
+
+                # ── Hoja 1: remito ──────────────────────────────
+                pdf.add_page()
+
+                # Encabezado
+                pdf.set_font("Arial", "B", 16)
+                pdf.cell(0, 10, "Remito de piezas de Garantía", ln=True, align="C")
+                pdf.set_font("Arial", "", 10)
+                pdf.cell(0, 6, f"Fecha: {date_str}    |    Total de piezas: {len(queue)}",
+                         ln=True, align="C")
+                pdf.ln(6)
+
+                # Línea divisoria
+                pdf.set_draw_color(180, 180, 180)
+                pdf.set_line_width(0.4)
+                pdf.line(15, pdf.get_y(), W - 15, pdf.get_y())
+                pdf.ln(4)
+
+                # Encabezado de tabla
+                col_w = {"num": 12, "orden": 58, "pieza": 78, "cantidad": 32}
+                pdf.set_fill_color(40, 40, 40)
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Arial", "B", 10)
+                pdf.cell(col_w["num"],      8, "#",        border=0, fill=True, align="C")
+                pdf.cell(col_w["orden"],    8, "Orden",    border=0, fill=True, align="C")
+                pdf.cell(col_w["pieza"],    8, "Pieza",    border=0, fill=True, align="C")
+                pdf.cell(col_w["cantidad"], 8, "Cantidad", border=0, fill=True, align="C")
+                pdf.ln()
+
+                # Filas
+                pdf.set_text_color(0, 0, 0)
+                pdf.set_font("Arial", "", 10)
+                fill_colors = [(255, 255, 255), (245, 245, 245)]
+                for idx, item in enumerate(queue, 1):
+                    r, g, b = fill_colors[idx % 2]
+                    pdf.set_fill_color(r, g, b)
+                    pdf.cell(col_w["num"],      7, str(idx),              border=0, fill=True, align="C")
+                    pdf.cell(col_w["orden"],    7, item["orden"],          border=0, fill=True)
+                    pdf.cell(col_w["pieza"],    7, item["pieza"],          border=0, fill=True)
+                    pdf.cell(col_w["cantidad"], 7, str(item["cantidad"]),  border=0, fill=True, align="C")
+                    pdf.ln()
+
+                # Línea cierre de tabla
+                pdf.set_draw_color(180, 180, 180)
+                pdf.line(15, pdf.get_y(), W - 15, pdf.get_y())
+                pdf.ln(8)
+
+                # Firma
+                pdf.set_font("Arial", "", 9)
+                pdf.set_text_color(120, 120, 120)
+                pdf.cell(0, 5, "Firma: ______________________________    Aclaracion: ______________________________",
+                         ln=True)
+
+                # ── Hojas 2+: etiquetas QR ──────────────────────
+                col_x = [15, 110]
+                row_y = [22, 112, 202]
+
+                for page_start in range(0, len(queue), 6):
+                    pdf.add_page()
+                    pdf.set_font("Arial", "", 9)
+                    pdf.set_text_color(100, 100, 100)
+                    pdf.cell(0, 0, text=f"Etiquetas QR  -  {date_str}")
+                    for i, item in enumerate(queue[page_start:page_start + 6]):
+                        pdf.image(item["path"], col_x[i % 2], row_y[i // 2], w=0, h=82)
+
+                pdf.output(pdf_path)
+                os.startfile(pdf_path)
+            except Exception as e:
+                messagebox.showerror("Error al generar PDF", str(e), parent=win)
+
+        btn_agregar.config(command=agregar)
+        btn_eliminar.config(command=eliminar)
+        btn_limpiar.config(command=limpiar)
+        btn_pdf.config(command=generar_pdf)
+
+        entry_orden.bind("<Return>",    lambda e: entry_pieza.focus())
+        entry_pieza.bind("<Return>",    lambda e: entry_cantidad.focus())
+        entry_cantidad.bind("<Return>", agregar)
+
+        def on_close():
+            for f in os.listdir(temp_dir):
+                fp = os.path.join(temp_dir, f)
+                if os.path.isfile(fp):
+                    try:
+                        os.remove(fp)
+                    except Exception:
+                        pass
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
+        win.after(100, entry_orden.focus)
+
+    # ──────────────────────────────────────────────
+    #  TAREAS
+    # ──────────────────────────────────────────────
+    def open_tasks_viewer(self):
+        from bson import ObjectId
+
+        COLS    = ("cierre", "orden", "descripcion", "reclamado", "contrato_pendiente", "observacion")
+        HEADERS = ("Cierre", "Orden", "Descripción", "Reclamado", "Contrato pend.", "Observación")
+        COL_W   = (88, 95, 190, 88, 95, 180)
+
+        editing_id = [None]   # ObjectId del doc en edición, None = nueva tarea
+
+        def _fmt_date(val):
+            if val and hasattr(val, "strftime"):
+                return val.strftime("%d/%m/%Y")
+            return str(val) if val else ""
+
+        def _parse_date(s):
+            s = s.strip()
+            if not s:
+                return None
+            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(s, fmt)
+                except ValueError:
+                    pass
+            raise ValueError(f"Fecha inválida: '{s}'. Usá dd/mm/yyyy")
+
+        def _row_values(doc):
+            return (
+                _fmt_date(doc.get("cierre")),
+                doc.get("orden", ""),
+                doc.get("descripcion", ""),
+                _fmt_date(doc.get("reclamado")),
+                "Sí" if doc.get("contrato_pendiente") else "No",
+                doc.get("observacion", ""),
+            )
+
+        # ── Ventana principal ──────────────────────────────────────────────
+        win = tk.Toplevel(self.root)
+        win.title("Tareas")
+        win.geometry("1180x560")
+        win.resizable(True, True)
+
+        # Header
+        header = tk.Frame(win, bg="#283593")
+        header.pack(fill=tk.X)
+        tk.Label(header, text="Tareas", font=("Arial", 12, "bold"),
+                 bg="#283593", fg="white").pack(side=tk.LEFT, padx=14, pady=8)
+
+        # Contenido principal: treeview (izq) + formulario (der)
+        body = tk.Frame(win)
+        body.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+
+        # ── Panel izquierdo: treeview ──────────────────────────────────────
+        left = tk.Frame(body)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        tree = ttk.Treeview(left, columns=COLS, show="headings", selectmode="browse")
+        for col, hdr, w in zip(COLS, HEADERS, COL_W):
+            tree.heading(col, text=hdr)
+            tree.column(col, width=w, minwidth=50)
+
+        vsb = ttk.Scrollbar(left, orient="vertical",   command=tree.yview)
+        hsb = ttk.Scrollbar(left, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        vsb.pack(side=tk.RIGHT,  fill=tk.Y)
+        hsb.pack(side=tk.BOTTOM, fill=tk.X)
+        tree.pack(fill=tk.BOTH, expand=True)
+
+        lbl_status = tk.Label(left, text="", font=("Arial", 8), fg="#555555", anchor="w")
+        lbl_status.pack(fill=tk.X, pady=(3, 0))
+
+        # ── Panel derecho: formulario ──────────────────────────────────────
+        sep = tk.Frame(body, bg="#cccccc", width=1)
+        sep.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0))
+
+        right = tk.Frame(body, width=272)
+        right.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 0))
+        right.pack_propagate(False)
+
+        lbl_form_title = tk.Label(right, text="Nueva tarea",
+                                  font=("Arial", 10, "bold"), fg="#283593", anchor="w")
+        lbl_form_title.pack(fill=tk.X, pady=(0, 8))
+
+        ff = tk.Frame(right)
+        ff.pack(fill=tk.X)
+        ff.columnconfigure(1, weight=1)
+
+        def _lbl(text, row):
+            tk.Label(ff, text=text, font=("Arial", 9), anchor="w").grid(
+                row=row, column=0, sticky="w", pady=3, padx=(0, 6))
+
+        def _ent(row):
+            e = tk.Entry(ff, font=("Arial", 10), relief=tk.SOLID, bd=1)
+            e.grid(row=row, column=1, sticky="ew", pady=3)
+            return e
+
+        _lbl("Cierre (dd/mm/yyyy):", 0);  e_cierre = _ent(0)
+        _lbl("Orden:",               1);  e_orden  = _ent(1)
+        _lbl("Descripción:",         2);  e_desc   = _ent(2)
+        _lbl("Reclamado (dd/mm/yyyy):", 3); e_recl = _ent(3)
+
+        _lbl("Contrato pendiente:", 4)
+        var_contrato = tk.BooleanVar()
+        tk.Checkbutton(ff, variable=var_contrato).grid(row=4, column=1, sticky="w", pady=3)
+
+        _lbl("Observación:", 5)
+        e_obs = tk.Text(ff, font=("Arial", 10), height=4, relief=tk.SOLID, bd=1, wrap=tk.WORD)
+        e_obs.grid(row=5, column=1, sticky="ew", pady=3)
+
+        lbl_err = tk.Label(right, text="", font=("Arial", 8), fg="#c62828",
+                           wraplength=260, anchor="w", justify="left")
+        lbl_err.pack(fill=tk.X, pady=(4, 0))
+
+        btn_row = tk.Frame(right)
+        btn_row.pack(fill=tk.X, pady=(8, 0))
+
+        btn_limpiar = tk.Button(btn_row, text="Nueva tarea",
+                                font=("Arial", 9), bg="#eeeeee",
+                                relief=tk.FLAT, padx=8)
+        btn_limpiar.pack(side=tk.LEFT)
+
+        btn_guardar = tk.Button(btn_row, text="Guardar",
+                                font=("Arial", 9, "bold"),
+                                bg="#283593", fg="white", relief=tk.FLAT, padx=10)
+        btn_guardar.pack(side=tk.RIGHT)
+
+        # ── Lógica ────────────────────────────────────────────────────────
+        def _load():
+            for iid in tree.get_children():
+                tree.delete(iid)
+            try:
+                docs = list(self._get_db()[self.coll_6].find().sort("cierre", 1))
+                for doc in docs:
+                    tree.insert("", tk.END, iid=str(doc["_id"]), values=_row_values(doc))
+                n = len(docs)
+                lbl_status.config(text=f"{n} tarea{'s' if n != 1 else ''}")
+            except Exception as exc:
+                lbl_status.config(text=f"Error: {exc}")
+
+        def _clear_form():
+            editing_id[0] = None
+            lbl_form_title.config(text="Nueva tarea")
+            lbl_err.config(text="")
+            for e in (e_cierre, e_orden, e_desc, e_recl):
+                e.delete(0, tk.END)
+            var_contrato.set(False)
+            e_obs.delete("1.0", tk.END)
+            tree.selection_remove(*tree.selection())
+
+        def _load_doc(doc):
+            editing_id[0] = doc["_id"]
+            lbl_form_title.config(text="Editar tarea")
+            lbl_err.config(text="")
+            e_cierre.delete(0, tk.END); e_cierre.insert(0, _fmt_date(doc.get("cierre")))
+            e_orden.delete(0, tk.END);  e_orden.insert(0,  doc.get("orden", ""))
+            e_desc.delete(0, tk.END);   e_desc.insert(0,   doc.get("descripcion", ""))
+            e_recl.delete(0, tk.END);   e_recl.insert(0,   _fmt_date(doc.get("reclamado")))
+            var_contrato.set(doc.get("contrato_pendiente", False))
+            e_obs.delete("1.0", tk.END)
+            if doc.get("observacion"):
+                e_obs.insert("1.0", doc["observacion"])
+
+        def _guardar():
+            lbl_err.config(text="")
+            try:
+                cierre = _parse_date(e_cierre.get())
+                recl   = _parse_date(e_recl.get())
+            except ValueError as exc:
+                lbl_err.config(text=str(exc))
+                return
+            datos = {
+                "cierre":             cierre,
+                "orden":              e_orden.get().strip(),
+                "descripcion":        e_desc.get().strip(),
+                "reclamado":          recl,
+                "contrato_pendiente": var_contrato.get(),
+                "observacion":        e_obs.get("1.0", tk.END).strip(),
+            }
+            try:
+                col = self._get_db()[self.coll_6]
+                if editing_id[0]:
+                    col.update_one({"_id": editing_id[0]}, {"$set": datos})
+                else:
+                    col.insert_one(datos)
+            except Exception as exc:
+                lbl_err.config(text=f"Error: {exc}")
+                return
+            _clear_form()
+            _load()
+
+        def _on_double_click(event):
+            sel = tree.selection()
+            if not sel:
+                return
+            try:
+                doc = self._get_db()[self.coll_6].find_one({"_id": ObjectId(sel[0])})
+            except Exception:
+                return
+            if doc:
+                _load_doc(doc)
+
+        tree.bind("<Double-1>", _on_double_click)
+        btn_guardar.config(command=_guardar)
+        btn_limpiar.config(command=_clear_form)
+
+        _load()
 
 
 if __name__ == "__main__":

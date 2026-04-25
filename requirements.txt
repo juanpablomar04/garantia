@@ -1,4 +1,7 @@
 annotated-types==0.7.0
+fpdf2==2.8.7
+Pillow==10.0.0
+qrcode==8.2
 anthropic==0.96.0
 anyio==4.13.0
 bottle==0.13.4
