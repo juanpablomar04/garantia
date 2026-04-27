@@ -7,11 +7,7 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
 from pymongo import MongoClient
-from dotenv import load_dotenv
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,7 +28,7 @@ class MongoApp:
         self.root.title("Administración de Garantía")
         self.root.geometry("1000x620")
 
-        self.mongo_uri = os.getenv("MONGO_URI")
+        self.mongo_uri = "mongodb+srv://pablomar04:auster1900@cluster0.g0ktnap.mongodb.net/?appName=Cluster0"
         self.db_name = "work"
         self.coll_1 = "orders"
         self.coll_2 = "parts"
@@ -52,7 +48,7 @@ class MongoApp:
     # ──────────────────────────────────────────────
     def _get_db(self):
         if not self.mongo_uri:
-            raise ValueError("MONGO_URI no está configurada. Verificá el archivo .env.")
+            raise ValueError("MONGO_URI no está configurada.")
         if self._client is None:
             self._client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=5000)
         return self._client[self.db_name]
@@ -67,31 +63,40 @@ class MongoApp:
         tk.Label(home, text="Administración de Garantía",
                  font=("Arial", 17, "bold"), bg="#ffffff", fg="#1a1a1a").pack(pady=(28, 4))
         tk.Label(home, text="Seleccioná una acción para comenzar",
-                 font=("Arial", 10), bg="#ffffff", fg="#999999").pack(pady=(0, 22))
+                 font=("Arial", 10), bg="#ffffff", fg="#999999").pack(pady=(0, 16))
 
-        grid = tk.Frame(home, bg="#ffffff")
-        grid.pack()
-
-        buttons = [
-            ("📋  Ver órdenes",         lambda: self.open_viewer(self.coll_1), "#e3f2fd", "#1565c0"),
-            ("🔩  Ver piezas",          lambda: self.open_viewer(self.coll_2), "#e3f2fd", "#1565c0"),
-            ("✅  Ver acreditaciones",   lambda: self.open_viewer(self.coll_3), "#e3f2fd", "#1565c0"),
-            ("⚠  Ver desvíos",          lambda: self.open_viewer(self.coll_4), "#fff3e0", "#e65100"),
-            ("🔍  Consulta por orden",  self.open_order_query,                 "#f3e5f5", "#6a1b9a"),
-            ("📊  Dashboard",           self.open_dashboard,                   "#fce4ec", "#880e4f"),
-            ("📷  Lector de órdenes",   self.open_order_scanner,               "#e8f5e9", "#1b5e20"),
-            ("📷  Lector de piezas",    self.open_parts_scanner,               "#e8f5e9", "#1b5e20"),
-            ("🏷   Generar QR piezas",  self.open_qr_generator,                "#fbe9e7", "#bf360c"),
-            ("📝  Ver tareas",          self.open_tasks_viewer,                "#e8eaf6", "#283593"),
+        sections = [
+            ("Gestión", [
+                ("📝  Tareas",          self.open_tasks_viewer,                   "#e8eaf6", "#283593"),
+                ("✅  Acreditaciones",  lambda: self.open_acreditaciones_viewer(), "#e3f2fd", "#1565c0"),
+                ("⚠  Desvíos",         lambda: self.open_viewer(self.coll_4),     "#fff3e0", "#e65100"),
+            ]),
+            ("Órdenes", [
+                ("📋  Órdenes",           lambda: self.open_viewer(self.coll_1), "#e3f2fd", "#1565c0"),
+                ("📷  Lector de órdenes", self.open_order_scanner,               "#e8f5e9", "#1b5e20"),
+            ]),
+            ("Piezas", [
+                ("🔩  Piezas",             lambda: self.open_viewer(self.coll_2), "#e3f2fd", "#1565c0"),
+                ("🏷   Generar QR piezas", self.open_qr_generator,               "#fbe9e7", "#bf360c"),
+                ("📷  Lector de piezas",   self.open_parts_scanner,              "#e8f5e9", "#1b5e20"),
+            ]),
+            ("Consultas", [
+                ("🔍  Consulta por orden", self.open_order_query, "#f3e5f5", "#6a1b9a"),
+                ("📊  Dashboard",          self.open_dashboard,   "#fce4ec", "#880e4f"),
+            ]),
         ]
 
-        for idx, (label, cmd, bg, fg) in enumerate(buttons):
-            row, col = divmod(idx, 4)
-            btn = tk.Button(grid, text=label, command=cmd,
-                            font=("Arial", 10), bg=bg, fg=fg,
-                            relief=tk.FLAT, width=20, pady=14,
-                            cursor="hand2", activebackground=bg)
-            btn.grid(row=row, column=col, padx=8, pady=8)
+        for sec_title, buttons in sections:
+            sec = tk.LabelFrame(home, text=sec_title,
+                                font=("Arial", 9, "bold"), bg="#ffffff",
+                                fg="#555555", padx=12, pady=10)
+            sec.pack(padx=24, pady=(0, 10), fill=tk.X)
+            for label, cmd, bg, fg in buttons:
+                btn = tk.Button(sec, text=label, command=cmd,
+                                font=("Arial", 10), bg=bg, fg=fg,
+                                relief=tk.FLAT, width=20, pady=14,
+                                cursor="hand2", activebackground=bg)
+                btn.pack(side=tk.LEFT, padx=8)
 
     # ──────────────────────────────────────────────
     #  BARRA DE ESTADO
@@ -134,37 +139,31 @@ class MongoApp:
         menubar = tk.Menu(self.root)
 
         options_menu = tk.Menu(menubar, tearoff=0)
-        options_menu.add_command(label="1. Ver órdenes",
-                                 command=lambda: self.open_viewer(self.coll_1))
-        options_menu.add_command(label="2. Ver piezas",
-                                 command=lambda: self.open_viewer(self.coll_2))
-        options_menu.add_command(label="3. Ver acreditaciones",
-                                 command=lambda: self.open_viewer(self.coll_3))
-        options_menu.add_command(label="4. Ver desvíos",
-                                 command=lambda: self.open_viewer(self.coll_4))
-        options_menu.add_command(label="5. Ver débitos",
-                                 command=self.open_debts_viewer)
-        options_menu.add_command(label="6. Ver tareas",
+        options_menu.add_command(label="1. Tareas",
                                  command=self.open_tasks_viewer)
+        options_menu.add_command(label="2. Acreditaciones",
+                                 command=lambda: self.open_acreditaciones_viewer())
+        options_menu.add_command(label="3. Desvíos",
+                                 command=lambda: self.open_viewer(self.coll_4))
+        options_menu.add_command(label="4. Órdenes",
+                                 command=lambda: self.open_viewer(self.coll_1))
+        options_menu.add_command(label="5. Piezas",
+                                 command=lambda: self.open_viewer(self.coll_2))
         options_menu.add_separator()
         options_menu.add_command(label="Exit", command=self.root.quit)
 
         edit_menu = tk.Menu(menubar, tearoff=0)
         edit_menu.add_command(label="Ingresar desvío", command=self.open_fault_form)
-        edit_menu.add_command(label="Ingresar débito", command=self.open_debt_form)
         edit_menu.add_separator()
         edit_menu.add_command(label="Generar QR piezas", command=self.open_qr_generator)
 
         queries_menu = tk.Menu(menubar, tearoff=0)
         queries_menu.add_command(label="Consulta por orden", command=self.open_order_query)
-
-        dashboard_menu = tk.Menu(menubar, tearoff=0)
-        dashboard_menu.add_command(label="Abrir dashboard", command=self.open_dashboard)
+        queries_menu.add_command(label="Dashboard", command=self.open_dashboard)
 
         menubar.add_cascade(label="Inicio", menu=options_menu)
         menubar.add_cascade(label="Editar", menu=edit_menu)
         menubar.add_cascade(label="Consultas", menu=queries_menu)
-        menubar.add_cascade(label="📊 Dashboard", menu=dashboard_menu)
 
         self.root.config(menu=menubar)
 
@@ -172,14 +171,18 @@ class MongoApp:
     #  UTILIDADES
     # ──────────────────────────────────────────────
     def _fmt_val(self, col: str, val) -> str:
-        if col in DATE_COL_NAMES and val:
+        if val is None:
+            return ""
+        if hasattr(val, "strftime"):
+            return val.strftime("%d/%m/%Y")
+        s = str(val)
+        # Reformat ISO datetime string (yyyy-mm-ddT... or yyyy-mm-dd ...) → dd/mm/yyyy
+        if len(s) >= 10 and s[4:5] == "-" and s[7:8] == "-":
             try:
-                if hasattr(val, "strftime"):
-                    return val.strftime("%Y-%m-%d")
-                return str(val).split("T")[0].split(" ")[0]
-            except Exception:
+                return datetime.strptime(s[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+            except ValueError:
                 pass
-        return str(val) if val is not None else ""
+        return s
 
     # ──────────────────────────────────────────────
     #  VISOR UNIFICADO DE COLECCIONES
@@ -188,7 +191,7 @@ class MongoApp:
         try:
             db = self._get_db()
             coll = db[collection_name]
-            raw_docs = list(coll.find(query or {}, limit=2000))
+            raw_docs = list(coll.find(query or {}))
             if not raw_docs:
                 messagebox.showwarning("Sin datos", f"No hay registros en '{collection_name}'.")
                 return
@@ -340,18 +343,24 @@ class MongoApp:
             tk.Label(toolbar, text="Doble click en una fila para ver detalle",
                      font=("Arial", 8, "italic"), bg="#f5f5f5", fg="#aaa").pack(side=tk.RIGHT, padx=10)
 
-            # ── Configurar columnas y filtros ──
+            # ── Configurar columnas, filtros y ancho auto-ajustado ──
+            CHAR_PX = 7
             for i, col in enumerate(columns):
-                tree.heading(col, text=col.replace("_", " ").upper(),
-                             command=lambda c=col: sort_by(c))
-                tree.column(col, width=140, minwidth=60)
+                header_text = col.replace("_", " ").upper()
+                col_w = max(
+                    len(header_text) * CHAR_PX + 20,
+                    max((len(str(row[i])) * CHAR_PX + 20 for row in processed_data), default=50),
+                    50,
+                )
+                tree.heading(col, text=header_text, command=lambda c=col: sort_by(c))
+                tree.column(col, width=col_w, minwidth=50, stretch=False)
 
-                tk.Label(filter_frame, text=col, font=("Arial", 8, "bold")).grid(
+                tk.Label(filter_frame, text=header_text, font=("Arial", 8, "bold")).grid(
                     row=0, column=i, padx=4, sticky="w"
                 )
                 v = tk.StringVar()
                 v.trace_add("write", schedule_filter)
-                tk.Entry(filter_frame, textvariable=v, width=14).grid(
+                tk.Entry(filter_frame, textvariable=v, width=max(col_w // 7, 8)).grid(
                     row=1, column=i, padx=4, pady=2
                 )
                 filter_vars[col] = v
@@ -372,6 +381,298 @@ class MongoApp:
             title="Ver débitos (desde 2026)",
             query={"fecha": {"$gte": datetime(2026, 1, 1)}},
         )
+
+    # ──────────────────────────────────────────────
+    #  VISOR DE ACREDITACIONES (filtros específicos)
+    # ──────────────────────────────────────────────
+    def open_acreditaciones_viewer(self):
+        win = tk.Toplevel(self.root)
+        win.title("Acreditaciones")
+        win.geometry("1100x600")
+
+        # ── Toolbar ──
+        toolbar = tk.Frame(win, bg="#f5f5f5", pady=4)
+        toolbar.pack(fill=tk.X, padx=10)
+
+        lbl_count = tk.Label(toolbar, text="Cargando...",
+                             font=("Arial", 9), bg="#f5f5f5", fg="#555")
+        lbl_count.pack(side=tk.LEFT)
+
+        # ── Panel de filtros ──
+        filter_frame = tk.LabelFrame(win, text="Filtros", font=("Arial", 8, "bold"),
+                                     padx=6, pady=4)
+        filter_frame.pack(fill=tk.X, padx=10, pady=(4, 0))
+
+        fv_claim  = tk.StringVar()
+        fv_vin    = tk.StringVar()
+        fv_desde  = tk.StringVar()
+        fv_hasta  = tk.StringVar()
+        fv_lote   = tk.StringVar()
+        fv_dealer = tk.StringVar()
+        fv_suc    = tk.StringVar()
+
+        _debounce = [None]
+
+        def _make_field(parent, label, var, col, width=14):
+            tk.Label(parent, text=label, font=("Arial", 8, "bold")).grid(
+                row=0, column=col, padx=(8, 2), sticky="w")
+            tk.Entry(parent, textvariable=var, width=width).grid(
+                row=1, column=col, padx=(8, 2), pady=2, sticky="w")
+
+        _make_field(filter_frame, "Claim",         fv_claim,  0, 16)
+        _make_field(filter_frame, "VIN",           fv_vin,    1, 18)
+        _make_field(filter_frame, "Fecha desde", fv_desde, 2, 12)
+        _make_field(filter_frame, "Fecha hasta", fv_hasta, 3, 12)
+        _make_field(filter_frame, "Lote",          fv_lote,   4, 12)
+        _make_field(filter_frame, "Dealer",        fv_dealer, 5, 14)
+        _make_field(filter_frame, "Sucursal",      fv_suc,    6, 14)
+
+        def _btn_limpiar():
+            for v in (fv_claim, fv_vin, fv_desde, fv_hasta, fv_lote, fv_dealer, fv_suc):
+                v.set("")
+
+        tk.Button(filter_frame, text="Limpiar", font=("Arial", 8),
+                  command=_btn_limpiar, relief=tk.FLAT,
+                  bg="#fff3e0", fg="#e65100", padx=6).grid(
+            row=1, column=7, padx=(12, 4), pady=2, sticky="w")
+
+        # ── Treeview ──
+        tree_frame = tk.Frame(win)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        tree = ttk.Treeview(tree_frame, columns=("_loading",), show="headings")
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical",   command=tree.yview)
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        vsb.pack(side=tk.RIGHT,  fill=tk.Y)
+        hsb.pack(side=tk.BOTTOM, fill=tk.X)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Estado mutable compartido con el hilo
+        _state = {"columns": [], "processed_data": [],
+                  "idx_claim": None, "idx_vin": None, "idx_fecha": None,
+                  "idx_lote": None, "idx_dealer": None, "idx_suc": None}
+
+        def _parse_date(s):
+            s = s.strip()
+            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(s, fmt)
+                except ValueError:
+                    pass
+            return None
+
+        def apply_filters():
+            columns       = _state["columns"]
+            processed_data = _state["processed_data"]
+            if not columns:
+                return
+            claim_t  = fv_claim.get().lower().strip()
+            vin_t    = fv_vin.get().lower().strip()
+            desde_dt = _parse_date(fv_desde.get())
+            hasta_dt = _parse_date(fv_hasta.get())
+            lote_t   = fv_lote.get().lower().strip()
+            dealer_t = fv_dealer.get().lower().strip()
+            suc_t    = fv_suc.get().lower().strip()
+            idx_claim  = _state["idx_claim"]
+            idx_vin    = _state["idx_vin"]
+            idx_fecha  = _state["idx_fecha"]
+            idx_lote   = _state["idx_lote"]
+            idx_dealer = _state["idx_dealer"]
+            idx_suc    = _state["idx_suc"]
+
+            for item in tree.get_children():
+                tree.delete(item)
+            shown = 0
+            for row in processed_data:
+                def cell(i):
+                    return row[i].lower() if i is not None and i < len(row) else ""
+
+                if claim_t  and claim_t  not in cell(idx_claim):
+                    continue
+                if vin_t    and vin_t    not in cell(idx_vin):
+                    continue
+                if lote_t   and lote_t   not in cell(idx_lote):
+                    continue
+                if dealer_t and dealer_t not in cell(idx_dealer):
+                    continue
+                if suc_t    and suc_t    not in cell(idx_suc):
+                    continue
+                if (desde_dt or hasta_dt) and idx_fecha is not None:
+                    row_dt = _parse_date(row[idx_fecha])
+                    if row_dt:
+                        if desde_dt and row_dt < desde_dt:
+                            continue
+                        if hasta_dt and row_dt > hasta_dt:
+                            continue
+                    else:
+                        if desde_dt or hasta_dt:
+                            continue
+                tree.insert("", tk.END, values=row)
+                shown += 1
+            lbl_count.config(text=f"{shown} / {len(processed_data)} registros")
+
+        def schedule_filter(*_):
+            if _debounce[0]:
+                win.after_cancel(_debounce[0])
+            _debounce[0] = win.after(300, apply_filters)
+
+        for v in (fv_claim, fv_vin, fv_desde, fv_hasta, fv_lote, fv_dealer, fv_suc):
+            v.trace_add("write", schedule_filter)
+
+        # ── Ordenamiento ──
+        _sort_state: dict[str, bool] = {}
+
+        def sort_by(col):
+            columns = _state["columns"]
+            asc = not _sort_state.get(col, True)
+            _sort_state[col] = asc
+            items = sorted(
+                tree.get_children(""),
+                key=lambda iid: (
+                    (0, float(tree.set(iid, col).replace(",", ".")))
+                    if tree.set(iid, col).replace(",", "").replace(".", "").lstrip("-").isdigit()
+                    else (1, tree.set(iid, col).lower())
+                ),
+                reverse=not asc,
+            )
+            for i, iid in enumerate(items):
+                tree.move(iid, "", i)
+            arrow = " ▲" if asc else " ▼"
+            for c in columns:
+                tree.heading(c, text=c.replace("_", " ").upper(), command=lambda x=c: sort_by(x))
+            tree.heading(col, text=col.replace("_", " ").upper() + arrow,
+                         command=lambda x=col: sort_by(x))
+
+        # ── Detalle con doble click ──
+        def show_detail(event):
+            columns = _state["columns"]
+            sel = tree.selection()
+            if not sel:
+                return
+            values = tree.item(sel[0], "values")
+            detail = tk.Toplevel(win)
+            detail.title("Detalle")
+            detail.geometry("440x420")
+            detail.resizable(True, True)
+            container = tk.Frame(detail)
+            container.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+            canvas = tk.Canvas(container, highlightthickness=0)
+            sb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+            inner = tk.Frame(canvas, bg="#ffffff")
+            inner.bind("<Configure>",
+                       lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.create_window((0, 0), window=inner, anchor="nw")
+            canvas.configure(yscrollcommand=sb.set)
+            for i, (col, val) in enumerate(zip(columns, values)):
+                bg = "#f4f4f4" if i % 2 == 0 else "#ffffff"
+                row_f = tk.Frame(inner, bg=bg)
+                row_f.pack(fill=tk.X, padx=4, pady=1)
+                tk.Label(row_f, text=col.replace("_", " ").upper() + ":",
+                         font=("Arial", 9, "bold"), bg=bg,
+                         width=20, anchor="w").pack(side=tk.LEFT, padx=(4, 8))
+                tk.Label(row_f, text=val, font=("Arial", 9), bg=bg,
+                         anchor="w", wraplength=260, justify=tk.LEFT).pack(
+                             side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
+            sb.pack(side=tk.RIGHT, fill=tk.Y)
+            canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        tree.bind("<Double-1>", show_detail)
+
+        # ── Exportar CSV ──
+        def export_csv():
+            columns = _state["columns"]
+            path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV", "*.csv")],
+                title="Exportar como CSV",
+                parent=win,
+            )
+            if not path:
+                return
+            rows = [tree.item(c, "values") for c in tree.get_children()]
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow(columns)
+                writer.writerows(rows)
+            messagebox.showinfo("Exportado", f"Exportado a:\n{path}", parent=win)
+
+        tk.Button(toolbar, text="Exportar CSV ⬇", font=("Arial", 9),
+                  command=export_csv, relief=tk.FLAT,
+                  bg="#e8f5e9", fg="#2e7d32", padx=8).pack(side=tk.RIGHT)
+        tk.Label(toolbar, text="Doble click para ver detalle",
+                 font=("Arial", 8, "italic"), bg="#f5f5f5", fg="#aaa").pack(
+                     side=tk.RIGHT, padx=10)
+
+        # ── Carga en hilo para no bloquear la UI ──
+        def _load_thread():
+            try:
+                db = self._get_db()
+                raw_docs = list(db[self.coll_3].find(
+                    {"Fecha": {"$gte": datetime(2025, 1, 1)}}
+                ))
+                if not raw_docs:
+                    win.after(0, lambda: (
+                        lbl_count.config(text="Sin datos"),
+                        messagebox.showwarning("Sin datos", "No hay acreditaciones registradas.",
+                                               parent=win)
+                    ))
+                    return
+
+                exclude = {"_id", "source"}
+                columns = [k for k in raw_docs[0].keys() if k not in exclude]
+                processed_data = [
+                    [self._fmt_val(c, doc.get(c, "")) for c in columns]
+                    for doc in raw_docs
+                ]
+
+                col_lower = [c.lower() for c in columns]
+
+                def _col_idx(*names):
+                    for n in names:
+                        for i, c in enumerate(col_lower):
+                            if n in c:
+                                return i
+                    return None
+
+                # Ancho por conteo de caracteres (7 px/char + padding)
+                CHAR_PX = 7
+                col_widths = [len(c.replace("_", " ").upper()) * CHAR_PX + 20 for c in columns]
+                for row in processed_data:
+                    for i, cell in enumerate(row):
+                        w = len(cell) * CHAR_PX + 20
+                        if w > col_widths[i]:
+                            col_widths[i] = w
+                col_widths = [max(w, 50) for w in col_widths]
+
+                _state["columns"]       = columns
+                _state["processed_data"] = processed_data
+                _state["idx_claim"]     = _col_idx("claim", "reclamo")
+                _state["idx_vin"]       = _col_idx("vin", "chasis", "chassis")
+                _state["idx_fecha"]     = _col_idx("fecha", "date")
+                _state["idx_lote"]      = _col_idx("lote", "batch")
+                _state["idx_dealer"]    = _col_idx("dealer", "concesion")
+                _state["idx_suc"]       = _col_idx("sucursal", "branch", "suc")
+
+                win.after(0, lambda: _setup_tree(columns, col_widths, processed_data))
+
+            except Exception as exc:
+                logger.error("Acreditaciones load error: %s", exc)
+                win.after(0, lambda: (
+                    lbl_count.config(text=f"Error: {exc}"),
+                    messagebox.showerror("Error", f"No se pudo cargar acreditaciones:\n{exc}",
+                                         parent=win)
+                ))
+
+        def _setup_tree(columns, col_widths, processed_data):
+            tree.configure(columns=columns)
+            for col, w in zip(columns, col_widths):
+                tree.heading(col, text=col.replace("_", " ").upper(),
+                             command=lambda c=col: sort_by(c))
+                tree.column(col, width=w, minwidth=50, stretch=False)
+            apply_filters()
+
+        threading.Thread(target=_load_thread, daemon=True).start()
 
     # ──────────────────────────────────────────────
     #  CONSULTA POR ORDEN
@@ -494,10 +795,10 @@ class MongoApp:
                     numero_claims = numero_orden
                 query_claims = _build_query(coll_claims, numero_claims)
 
-                orders_docs = list(coll_orders.find(query_orders, limit=1000)) if query_orders else []
-                parts_docs  = list(coll_parts.find(query_parts,   limit=1000)) if query_parts  else []
-                claims_docs = list(coll_claims.find(query_claims,  limit=1000)) if query_claims else []
-                faults_docs = list(coll_faults.find(query_faults,  limit=1000)) if query_faults else []
+                orders_docs = list(coll_orders.find(query_orders)) if query_orders else []
+                parts_docs  = list(coll_parts.find(query_parts))   if query_parts  else []
+                claims_docs = list(coll_claims.find(query_claims))  if query_claims else []
+                faults_docs = list(coll_faults.find(query_faults))  if query_faults else []
 
                 total = len(orders_docs) + len(parts_docs) + len(claims_docs) + len(faults_docs)
                 if total == 0:
@@ -1247,11 +1548,9 @@ class MongoApp:
     def open_tasks_viewer(self):
         from bson import ObjectId
 
-        COLS    = ("cierre", "orden", "descripcion", "reclamado", "contrato_pendiente", "observacion")
-        HEADERS = ("Cierre", "Orden", "Descripción", "Reclamado", "Contrato pend.", "Observación")
-        COL_W   = (88, 95, 190, 88, 95, 180)
-
-        editing_id = [None]   # ObjectId del doc en edición, None = nueva tarea
+        COLS    = ("orden", "descripcion", "cierre", "reclamado", "contrato_pendiente", "observacion", "estado")
+        HEADERS = ("Orden", "Descripción", "Cierre", "Reclamado", "Contrato pend.", "Observación", "Estado")
+        COL_W   = (95, 190, 88, 88, 95, 180, 88)
 
         def _fmt_date(val):
             if val and hasattr(val, "strftime"):
@@ -1269,20 +1568,32 @@ class MongoApp:
                     pass
             raise ValueError(f"Fecha inválida: '{s}'. Usá dd/mm/yyyy")
 
-        def _row_values(doc):
+        def _acred_keys(orden):
+            if orden.startswith("20"):
+                return ["2" + orden[2:]]
+            if orden.startswith("60"):
+                return ["26" + orden[2:]]
+            if orden.startswith("50"):
+                return ["15" + orden[2:], "5" + orden[2:]]
+            return [orden]
+
+        def _row_values(doc, acred_values: set):
+            orden = doc.get("orden", "")
+            acreditado = any(k in acred_values for k in _acred_keys(orden)) if orden else False
             return (
-                _fmt_date(doc.get("cierre")),
-                doc.get("orden", ""),
+                orden,
                 doc.get("descripcion", ""),
+                _fmt_date(doc.get("cierre")),
                 _fmt_date(doc.get("reclamado")),
                 "Sí" if doc.get("contrato_pendiente") else "No",
                 doc.get("observacion", ""),
+                "Acreditado" if acreditado else "Pendiente",
             )
 
         # ── Ventana principal ──────────────────────────────────────────────
         win = tk.Toplevel(self.root)
         win.title("Tareas")
-        win.geometry("1180x560")
+        win.geometry("980x560")
         win.resizable(True, True)
 
         # Header
@@ -1290,148 +1601,421 @@ class MongoApp:
         header.pack(fill=tk.X)
         tk.Label(header, text="Tareas", font=("Arial", 12, "bold"),
                  bg="#283593", fg="white").pack(side=tk.LEFT, padx=14, pady=8)
+        tk.Button(header, text="+ Nueva Tarea",
+                  font=("Arial", 9, "bold"), bg="#5c6bc0", fg="white",
+                  relief=tk.FLAT, padx=10, pady=4,
+                  cursor="hand2").pack(side=tk.RIGHT, padx=10, pady=6)
 
-        # Contenido principal: treeview (izq) + formulario (der)
-        body = tk.Frame(win)
-        body.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+        # Toolbar
+        toolbar = tk.Frame(win, bg="#f5f5f5", pady=4)
+        toolbar.pack(fill=tk.X, padx=10)
+        lbl_count = tk.Label(toolbar, text="", font=("Arial", 9), bg="#f5f5f5", fg="#555")
+        lbl_count.pack(side=tk.LEFT)
+        tk.Button(toolbar, text="Exportar CSV ⬇", font=("Arial", 9),
+                  command=lambda: _export_csv(), relief=tk.FLAT,
+                  bg="#e8f5e9", fg="#2e7d32", padx=8).pack(side=tk.RIGHT)
 
-        # ── Panel izquierdo: treeview ──────────────────────────────────────
-        left = tk.Frame(body)
-        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Filtros
+        filter_frame = tk.LabelFrame(win, text="Filtros", font=("Arial", 8, "bold"),
+                                     bg="#f5f5f5", padx=6, pady=4)
+        filter_frame.pack(fill=tk.X, padx=10, pady=(4, 0))
 
-        tree = ttk.Treeview(left, columns=COLS, show="headings", selectmode="browse")
-        for col, hdr, w in zip(COLS, HEADERS, COL_W):
+        filter_vars: dict[str, tk.StringVar] = {}
+        _debounce = [None]
+
+        # Texto: columnas sin rango de fecha
+        TEXT_COLS = ("orden", "descripcion", "contrato_pendiente", "observacion", "estado")
+        TEXT_HDRS = ("Orden", "Descripción", "Contrato pend.", "Observación", "Estado")
+        for i, (col, hdr) in enumerate(zip(TEXT_COLS, TEXT_HDRS)):
+            tk.Label(filter_frame, text=hdr, font=("Arial", 7, "bold"),
+                     bg="#f5f5f5", fg="#555555").grid(row=0, column=i, padx=3, sticky="w")
+            v = tk.StringVar()
+            filter_vars[col] = v
+            tk.Entry(filter_frame, textvariable=v, font=("Arial", 9),
+                     width=11).grid(row=1, column=i, padx=3, pady=(0, 2), sticky="ew")
+
+        # Separador vertical
+        tk.Frame(filter_frame, bg="#cccccc", width=1).grid(
+            row=0, column=len(TEXT_COLS), rowspan=2, sticky="ns", padx=(8, 4))
+
+        # Rangos de fecha: Cierre y Reclamado
+        DATE_FIELDS = [
+            ("cierre",    "Cierre desde",    "Cierre hasta"),
+            ("reclamado", "Reclamado desde", "Reclamado hasta"),
+        ]
+        fv_desde: dict[str, tk.StringVar] = {}
+        fv_hasta:  dict[str, tk.StringVar] = {}
+        base_col = len(TEXT_COLS) + 1
+        for j, (field, lbl_desde, lbl_hasta) in enumerate(DATE_FIELDS):
+            c = base_col + j * 2
+            tk.Label(filter_frame, text=lbl_desde, font=("Arial", 7, "bold"),
+                     bg="#f5f5f5", fg="#555555").grid(row=0, column=c, padx=3, sticky="w")
+            vd = tk.StringVar()
+            fv_desde[field] = vd
+            tk.Entry(filter_frame, textvariable=vd, font=("Arial", 9),
+                     width=10).grid(row=1, column=c, padx=3, pady=(0, 2), sticky="ew")
+
+            tk.Label(filter_frame, text=lbl_hasta, font=("Arial", 7, "bold"),
+                     bg="#f5f5f5", fg="#555555").grid(row=0, column=c+1, padx=3, sticky="w")
+            vh = tk.StringVar()
+            fv_hasta[field] = vh
+            tk.Entry(filter_frame, textvariable=vh, font=("Arial", 9),
+                     width=10).grid(row=1, column=c+1, padx=3, pady=(0, 2), sticky="ew")
+
+        # Botón limpiar
+        def _limpiar_filtros():
+            for v in filter_vars.values():
+                v.set("")
+            for v in list(fv_desde.values()) + list(fv_hasta.values()):
+                v.set("")
+
+        tk.Button(filter_frame, text="Limpiar", font=("Arial", 8),
+                  command=_limpiar_filtros, relief=tk.FLAT,
+                  bg="#fff3e0", fg="#e65100", padx=6).grid(
+            row=1, column=base_col + len(DATE_FIELDS) * 2, padx=(10, 2), pady=(0, 2), sticky="w")
+
+        # Treeview
+        tree_frame = tk.Frame(win)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(4, 0))
+
+        tree = ttk.Treeview(tree_frame, columns=COLS, show="headings", selectmode="extended")
+        for col, hdr in zip(COLS, HEADERS):
             tree.heading(col, text=hdr)
-            tree.column(col, width=w, minwidth=50)
+            tree.column(col, width=COL_W[COLS.index(col)], minwidth=50)
+        tree.tag_configure("acreditado", foreground="#1b5e20")
+        tree.tag_configure("pendiente",  foreground="#e65100")
 
-        vsb = ttk.Scrollbar(left, orient="vertical",   command=tree.yview)
-        hsb = ttk.Scrollbar(left, orient="horizontal", command=tree.xview)
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical",   command=tree.yview)
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
         tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         vsb.pack(side=tk.RIGHT,  fill=tk.Y)
         hsb.pack(side=tk.BOTTOM, fill=tk.X)
         tree.pack(fill=tk.BOTH, expand=True)
 
-        lbl_status = tk.Label(left, text="", font=("Arial", 8), fg="#555555", anchor="w")
-        lbl_status.pack(fill=tk.X, pady=(3, 0))
+        # Barra inferior
+        bottom = tk.Frame(win)
+        bottom.pack(fill=tk.X, padx=10, pady=(4, 8))
 
-        # ── Panel derecho: formulario ──────────────────────────────────────
-        sep = tk.Frame(body, bg="#cccccc", width=1)
-        sep.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0))
+        lbl_status = tk.Label(bottom, text="", font=("Arial", 8), fg="#555555", anchor="w")
+        lbl_status.pack(side=tk.LEFT)
 
-        right = tk.Frame(body, width=272)
-        right.pack(side=tk.LEFT, fill=tk.Y, padx=(10, 0))
-        right.pack_propagate(False)
+        btn_eliminar = tk.Button(bottom, text="Eliminar seleccionado",
+                                 font=("Arial", 9, "bold"),
+                                 bg="#c62828", fg="white", relief=tk.FLAT, padx=10)
+        btn_eliminar.pack(side=tk.RIGHT)
 
-        lbl_form_title = tk.Label(right, text="Nueva tarea",
-                                  font=("Arial", 10, "bold"), fg="#283593", anchor="w")
-        lbl_form_title.pack(fill=tk.X, pady=(0, 8))
+        def _export_csv():
+            path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV", "*.csv")],
+                title="Exportar tareas como CSV",
+                parent=win,
+            )
+            if not path:
+                return
+            rows = [tree.item(c, "values") for c in tree.get_children()]
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow(HEADERS)
+                writer.writerows(rows)
+            messagebox.showinfo("Exportado", f"Exportado a:\n{path}", parent=win)
 
-        ff = tk.Frame(right)
-        ff.pack(fill=tk.X)
-        ff.columnconfigure(1, weight=1)
+        # ── Lógica principal ───────────────────────────────────────────────
+        all_rows: list[tuple] = []
+        _estado_idx = COLS.index("estado")
 
-        def _lbl(text, row):
-            tk.Label(ff, text=text, font=("Arial", 9), anchor="w").grid(
-                row=row, column=0, sticky="w", pady=3, padx=(0, 6))
+        _idx = {col: i for i, col in enumerate(COLS)}
 
-        def _ent(row):
-            e = tk.Entry(ff, font=("Arial", 10), relief=tk.SOLID, bd=1)
-            e.grid(row=row, column=1, sticky="ew", pady=3)
-            return e
+        def _apply_filters():
+            terms = {col: filter_vars[col].get().lower() for col in TEXT_COLS}
+            # Parsear rangos de fecha (silenciar errores de formato incompleto)
+            date_ranges = {}
+            for field in ("cierre", "reclamado"):
+                try:
+                    d = _parse_date(fv_desde[field].get()) if fv_desde[field].get().strip() else None
+                except ValueError:
+                    d = None
+                try:
+                    h = _parse_date(fv_hasta[field].get()) if fv_hasta[field].get().strip() else None
+                except ValueError:
+                    h = None
+                date_ranges[field] = (d, h)
 
-        _lbl("Cierre (dd/mm/yyyy):", 0);  e_cierre = _ent(0)
-        _lbl("Orden:",               1);  e_orden  = _ent(1)
-        _lbl("Descripción:",         2);  e_desc   = _ent(2)
-        _lbl("Reclamado (dd/mm/yyyy):", 3); e_recl = _ent(3)
-
-        _lbl("Contrato pendiente:", 4)
-        var_contrato = tk.BooleanVar()
-        tk.Checkbutton(ff, variable=var_contrato).grid(row=4, column=1, sticky="w", pady=3)
-
-        _lbl("Observación:", 5)
-        e_obs = tk.Text(ff, font=("Arial", 10), height=4, relief=tk.SOLID, bd=1, wrap=tk.WORD)
-        e_obs.grid(row=5, column=1, sticky="ew", pady=3)
-
-        lbl_err = tk.Label(right, text="", font=("Arial", 8), fg="#c62828",
-                           wraplength=260, anchor="w", justify="left")
-        lbl_err.pack(fill=tk.X, pady=(4, 0))
-
-        btn_row = tk.Frame(right)
-        btn_row.pack(fill=tk.X, pady=(8, 0))
-
-        btn_limpiar = tk.Button(btn_row, text="Nueva tarea",
-                                font=("Arial", 9), bg="#eeeeee",
-                                relief=tk.FLAT, padx=8)
-        btn_limpiar.pack(side=tk.LEFT)
-
-        btn_guardar = tk.Button(btn_row, text="Guardar",
-                                font=("Arial", 9, "bold"),
-                                bg="#283593", fg="white", relief=tk.FLAT, padx=10)
-        btn_guardar.pack(side=tk.RIGHT)
-
-        # ── Lógica ────────────────────────────────────────────────────────
-        def _load():
             for iid in tree.get_children():
                 tree.delete(iid)
+            shown = 0
+            for iid, vals in all_rows:
+                # Filtros de texto
+                if any(terms[col] and terms[col] not in str(vals[_idx[col]]).lower()
+                       for col in TEXT_COLS):
+                    continue
+                # Filtros de rango de fecha
+                skip = False
+                for field in ("cierre", "reclamado"):
+                    desde_dt, hasta_dt = date_ranges[field]
+                    if not (desde_dt or hasta_dt):
+                        continue
+                    raw = str(vals[_idx[field]])
+                    try:
+                        row_dt = _parse_date(raw) if raw else None
+                    except ValueError:
+                        row_dt = None
+                    if row_dt is None:
+                        skip = True
+                        break
+                    if desde_dt and row_dt < desde_dt:
+                        skip = True
+                        break
+                    if hasta_dt and row_dt > hasta_dt:
+                        skip = True
+                        break
+                if skip:
+                    continue
+                tag = "acreditado" if vals[_estado_idx] == "Acreditado" else "pendiente"
+                tree.insert("", tk.END, iid=iid, values=vals, tags=(tag,))
+                shown += 1
+            total = len(all_rows)
+            count_text = f"{shown} / {total} tarea{'s' if total != 1 else ''}"
+            lbl_count.config(text=count_text)
+            lbl_status.config(text=count_text)
+
+        def _schedule_filter(*_):
+            if _debounce[0]:
+                win.after_cancel(_debounce[0])
+            _debounce[0] = win.after(250, _apply_filters)
+
+        for v in filter_vars.values():
+            v.trace_add("write", _schedule_filter)
+        for v in list(fv_desde.values()) + list(fv_hasta.values()):
+            v.trace_add("write", _schedule_filter)
+
+        def _load():
+            all_rows.clear()
             try:
-                docs = list(self._get_db()[self.coll_6].find().sort("cierre", 1))
+                db = self._get_db()
+                acred_values: set = set()
+                for doc in db[self.coll_3].find({}, {"_id": 0, "source": 0}):
+                    for v in doc.values():
+                        if isinstance(v, str):
+                            acred_values.add(v)
+                docs = list(db[self.coll_6].find().sort("cierre", 1))
                 for doc in docs:
-                    tree.insert("", tk.END, iid=str(doc["_id"]), values=_row_values(doc))
-                n = len(docs)
-                lbl_status.config(text=f"{n} tarea{'s' if n != 1 else ''}")
+                    all_rows.append((str(doc["_id"]), _row_values(doc, acred_values)))
             except Exception as exc:
                 lbl_status.config(text=f"Error: {exc}")
-
-        def _clear_form():
-            editing_id[0] = None
-            lbl_form_title.config(text="Nueva tarea")
-            lbl_err.config(text="")
-            for e in (e_cierre, e_orden, e_desc, e_recl):
-                e.delete(0, tk.END)
-            var_contrato.set(False)
-            e_obs.delete("1.0", tk.END)
-            tree.selection_remove(*tree.selection())
-
-        def _load_doc(doc):
-            editing_id[0] = doc["_id"]
-            lbl_form_title.config(text="Editar tarea")
-            lbl_err.config(text="")
-            e_cierre.delete(0, tk.END); e_cierre.insert(0, _fmt_date(doc.get("cierre")))
-            e_orden.delete(0, tk.END);  e_orden.insert(0,  doc.get("orden", ""))
-            e_desc.delete(0, tk.END);   e_desc.insert(0,   doc.get("descripcion", ""))
-            e_recl.delete(0, tk.END);   e_recl.insert(0,   _fmt_date(doc.get("reclamado")))
-            var_contrato.set(doc.get("contrato_pendiente", False))
-            e_obs.delete("1.0", tk.END)
-            if doc.get("observacion"):
-                e_obs.insert("1.0", doc["observacion"])
-
-        def _guardar():
-            lbl_err.config(text="")
-            try:
-                cierre = _parse_date(e_cierre.get())
-                recl   = _parse_date(e_recl.get())
-            except ValueError as exc:
-                lbl_err.config(text=str(exc))
                 return
-            datos = {
-                "cierre":             cierre,
-                "orden":              e_orden.get().strip(),
-                "descripcion":        e_desc.get().strip(),
-                "reclamado":          recl,
-                "contrato_pendiente": var_contrato.get(),
-                "observacion":        e_obs.get("1.0", tk.END).strip(),
-            }
-            try:
-                col = self._get_db()[self.coll_6]
-                if editing_id[0]:
-                    col.update_one({"_id": editing_id[0]}, {"$set": datos})
-                else:
-                    col.insert_one(datos)
-            except Exception as exc:
-                lbl_err.config(text=f"Error: {exc}")
-                return
-            _clear_form()
-            _load()
+            _apply_filters()
+            # Auto-ajuste de ancho por contenido
+            CHAR_PX = 7
+            for i, (col, hdr) in enumerate(zip(COLS, HEADERS)):
+                col_w = len(hdr) * CHAR_PX + 20
+                for _, vals in all_rows:
+                    w = len(str(vals[i])) * CHAR_PX + 20
+                    if w > col_w:
+                        col_w = w
+                tree.column(col, width=max(col_w, 50))
+
+        # ── Formulario en popup ────────────────────────────────────────────
+        def _open_form(doc=None):
+            is_edit = doc is not None
+            fwin = tk.Toplevel(win)
+            fwin.title("Editar tarea" if is_edit else "Nueva tarea")
+            fwin.resizable(True, True)
+            fwin.grab_set()
+
+            editing_id = doc["_id"] if is_edit else None
+
+            if is_edit:
+                fwin.geometry("1200x520")
+                outer = tk.Frame(fwin)
+                outer.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
+
+                form_panel = tk.Frame(outer, width=300)
+                form_panel.pack(side=tk.LEFT, fill=tk.Y)
+                form_panel.pack_propagate(False)
+
+                tk.Frame(outer, bg="#cccccc", width=1).pack(
+                    side=tk.LEFT, fill=tk.Y, padx=(12, 0))
+
+                notebook = ttk.Notebook(outer)
+                notebook.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0))
+            else:
+                fwin.geometry("420x400")
+                outer = tk.Frame(fwin)
+                outer.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
+                form_panel = outer
+
+            # Campos del formulario
+            tk.Label(form_panel, text="Editar tarea" if is_edit else "Nueva tarea",
+                     font=("Arial", 10, "bold"), fg="#283593", anchor="w").pack(
+                         fill=tk.X, pady=(0, 8))
+
+            ff = tk.Frame(form_panel)
+            ff.pack(fill=tk.X)
+            ff.columnconfigure(1, weight=1)
+
+            def _lbl(text, row):
+                tk.Label(ff, text=text, font=("Arial", 9), anchor="w").grid(
+                    row=row, column=0, sticky="w", pady=3, padx=(0, 6))
+
+            def _ent(row):
+                e = tk.Entry(ff, font=("Arial", 10), relief=tk.SOLID, bd=1)
+                e.grid(row=row, column=1, sticky="ew", pady=3)
+                return e
+
+            _lbl("Orden:",                  0); e_orden  = _ent(0)
+            _lbl("Descripción:",            1); e_desc   = _ent(1)
+            _lbl("Cierre (dd/mm/yyyy):",    2); e_cierre = _ent(2)
+            _lbl("Reclamado (dd/mm/yyyy):", 3); e_recl   = _ent(3)
+            _lbl("Contrato pendiente:",     4)
+            var_contrato = tk.BooleanVar()
+            tk.Checkbutton(ff, variable=var_contrato).grid(row=4, column=1, sticky="w", pady=3)
+            _lbl("Observación:", 5)
+            e_obs = tk.Text(ff, font=("Arial", 10), height=4, relief=tk.SOLID, bd=1, wrap=tk.WORD)
+            e_obs.grid(row=5, column=1, sticky="ew", pady=3)
+
+            lbl_err = tk.Label(form_panel, text="", font=("Arial", 8), fg="#c62828",
+                               wraplength=280, anchor="w", justify="left")
+            lbl_err.pack(fill=tk.X, pady=(4, 0))
+
+            btn_row = tk.Frame(form_panel)
+            btn_row.pack(fill=tk.X, pady=(8, 0))
+            tk.Button(btn_row, text="Cancelar", font=("Arial", 9),
+                      bg="#eeeeee", relief=tk.FLAT, padx=8,
+                      command=fwin.destroy).pack(side=tk.LEFT)
+
+            def _guardar():
+                lbl_err.config(text="")
+                try:
+                    cierre = _parse_date(e_cierre.get())
+                    recl   = _parse_date(e_recl.get())
+                except ValueError as exc:
+                    lbl_err.config(text=str(exc))
+                    return
+                datos = {
+                    "cierre":             cierre,
+                    "orden":              e_orden.get().strip(),
+                    "descripcion":        e_desc.get().strip(),
+                    "reclamado":          recl,
+                    "contrato_pendiente": var_contrato.get(),
+                    "observacion":        e_obs.get("1.0", tk.END).strip(),
+                }
+                try:
+                    col = self._get_db()[self.coll_6]
+                    if editing_id:
+                        col.update_one({"_id": editing_id}, {"$set": datos})
+                    else:
+                        col.insert_one(datos)
+                except Exception as exc:
+                    lbl_err.config(text=f"Error: {exc}")
+                    return
+                fwin.destroy()
+                _load()
+
+            tk.Button(btn_row, text="Guardar", font=("Arial", 9, "bold"),
+                      bg="#283593", fg="white", relief=tk.FLAT, padx=10,
+                      command=_guardar).pack(side=tk.RIGHT)
+
+            # Pre-llenar campos si es edición
+            if is_edit:
+                e_orden.insert(0,  doc.get("orden", ""))
+                e_desc.insert(0,   doc.get("descripcion", ""))
+                e_cierre.insert(0, _fmt_date(doc.get("cierre")))
+                e_recl.insert(0,   _fmt_date(doc.get("reclamado")))
+                var_contrato.set(doc.get("contrato_pendiente", False))
+                if doc.get("observacion"):
+                    e_obs.insert("1.0", doc["observacion"])
+
+                orden = doc.get("orden", "")
+
+                def _populate_tab(parent, coll_name, docs, empty_msg):
+                    if not docs:
+                        tk.Label(parent, text=empty_msg,
+                                 font=("Arial", 9, "italic"), fg="#888888").pack(pady=20)
+                        return
+                    exclude = {"_id", "source"}
+                    cols = [k for k in docs[0].keys() if k not in exclude]
+                    rows = [[self._fmt_val(c, d.get(c, "")) for c in cols] for d in docs]
+                    CHAR_PX = 7
+                    col_widths = [max(len(c.replace("_", " ").upper()) * CHAR_PX + 20,
+                                      max((len(str(r[i])) * CHAR_PX + 20 for r in rows), default=50),
+                                      50)
+                                  for i, c in enumerate(cols)]
+                    t = ttk.Treeview(parent, columns=cols, show="headings")
+                    for c, w in zip(cols, col_widths):
+                        t.heading(c, text=c.replace("_", " ").upper())
+                        t.column(c, width=w, minwidth=50, stretch=False)
+                    vsb = ttk.Scrollbar(parent, orient="vertical",   command=t.yview)
+                    hsb = ttk.Scrollbar(parent, orient="horizontal", command=t.xview)
+                    t.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+                    vsb.pack(side=tk.RIGHT,  fill=tk.Y)
+                    hsb.pack(side=tk.BOTTOM, fill=tk.X)
+                    t.pack(fill=tk.BOTH, expand=True)
+                    for row in rows:
+                        t.insert("", tk.END, values=row)
+
+                try:
+                    db = self._get_db()
+
+                    # Acreditaciones
+                    sample = db[self.coll_3].find_one()
+                    if sample:
+                        exclude = {"_id", "source"}
+                        str_fields = [k for k, v in sample.items()
+                                      if k not in exclude and isinstance(v, str)]
+                        keys = _acred_keys(orden)
+                        q = {"$or": [{f: {"$regex": k, "$options": "i"}}
+                                     for f in str_fields for k in keys]}
+                        acred_docs = list(db[self.coll_3].find(q))
+                    else:
+                        acred_docs = []
+
+                    # Piezas
+                    sample_p = db[self.coll_2].find_one()
+                    if sample_p and orden:
+                        exclude = {"_id", "source"}
+                        str_fields_p = [k for k, v in sample_p.items()
+                                        if k not in exclude and isinstance(v, str)]
+                        q_p = {"$or": [{f: {"$regex": orden, "$options": "i"}}
+                                       for f in str_fields_p]} if str_fields_p else None
+                        parts_docs = list(db[self.coll_2].find(q_p)) if q_p else []
+                    else:
+                        parts_docs = []
+
+                    # Desvíos
+                    sample_f = db[self.coll_4].find_one()
+                    if sample_f and orden:
+                        exclude = {"_id", "source"}
+                        str_fields_f = [k for k, v in sample_f.items()
+                                        if k not in exclude and isinstance(v, str)]
+                        q_f = {"$or": [{f: {"$regex": orden, "$options": "i"}}
+                                       for f in str_fields_f]} if str_fields_f else None
+                        faults_docs = list(db[self.coll_4].find(q_f)) if q_f else []
+                    else:
+                        faults_docs = []
+
+                except Exception as exc:
+                    acred_docs = parts_docs = faults_docs = []
+                    tk.Label(notebook, text=f"Error: {exc}", fg="#c62828").pack(pady=10)
+
+                tab_acred  = tk.Frame(notebook)
+                tab_parts  = tk.Frame(notebook)
+                tab_faults = tk.Frame(notebook)
+                notebook.add(tab_acred,  text=f"✅ Acreditaciones ({len(acred_docs)})")
+                notebook.add(tab_parts,  text=f"🔩 Piezas ({len(parts_docs)})")
+                notebook.add(tab_faults, text=f"⚠ Desvíos ({len(faults_docs)})")
+
+                _populate_tab(tab_acred,  self.coll_3, acred_docs,
+                              f"Sin acreditaciones para orden '{orden}'")
+                _populate_tab(tab_parts,  self.coll_2, parts_docs,
+                              f"Sin piezas para orden '{orden}'")
+                _populate_tab(tab_faults, self.coll_4, faults_docs,
+                              f"Sin desvíos para orden '{orden}'")
+
+            e_orden.focus()
+
+        # Conectar botón Nueva Tarea
+        header.winfo_children()[-1].config(command=lambda: _open_form())
 
         def _on_double_click(event):
             sel = tree.selection()
@@ -1442,11 +2026,31 @@ class MongoApp:
             except Exception:
                 return
             if doc:
-                _load_doc(doc)
+                _open_form(doc)
+
+        def _eliminar():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning("Sin selección",
+                                       "Seleccioná al menos una tarea para eliminar.", parent=win)
+                return
+            n = len(sel)
+            if not messagebox.askyesno(
+                "Confirmar eliminación",
+                f"¿Eliminar {n} tarea{'s' if n > 1 else ''} seleccionada{'s' if n > 1 else ''}?",
+                parent=win,
+            ):
+                return
+            try:
+                self._get_db()[self.coll_6].delete_many(
+                    {"_id": {"$in": [ObjectId(iid) for iid in sel]}})
+            except Exception as exc:
+                messagebox.showerror("Error", f"No se pudo eliminar:\n{exc}", parent=win)
+                return
+            _load()
 
         tree.bind("<Double-1>", _on_double_click)
-        btn_guardar.config(command=_guardar)
-        btn_limpiar.config(command=_clear_form)
+        btn_eliminar.config(command=_eliminar)
 
         _load()
 
