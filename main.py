@@ -1087,18 +1087,26 @@ class MongoApp:
         import subprocess, sys
         from pathlib import Path
 
-        viewer = Path(__file__).parent / "dashboard_viewer.py"
-        if not viewer.exists():
-            messagebox.showerror(
-                "Archivo faltante",
-                f"No se encontró dashboard_viewer.py en:\n{viewer}",
-            )
-            return
-
-        subprocess.Popen(
-            [sys.executable, str(viewer)],
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-        )
+        # Cuando está empaquetado con PyInstaller, sys.frozen es True
+        if getattr(sys, "frozen", False):
+            # El dashboard_viewer.exe estará junto al main .exe
+            base = Path(sys.executable).parent
+            viewer = base / "dashboard_viewer.exe"
+            if not viewer.exists():
+                messagebox.showerror("Archivo faltante",
+                    f"No se encontró dashboard_viewer.exe en:\n{viewer}")
+                return
+            subprocess.Popen([str(viewer)],
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+        else:
+            # Modo desarrollo normal
+            viewer = Path(__file__).parent / "dashboard_viewer.py"
+            if not viewer.exists():
+                messagebox.showerror("Archivo faltante",
+                    f"No se encontró dashboard_viewer.py en:\n{viewer}")
+                return
+            subprocess.Popen([sys.executable, str(viewer)],
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
 
     # ──────────────────────────────────────────────
     #  LECTOR DE ÓRDENES

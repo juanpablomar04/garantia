@@ -1,0 +1,348 @@
+('C:\\Users\\Juan '
+ 'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\dashboard_viewer.pkg',
+ {'BINARY': True,
+  'DATA': True,
+  'EXECUTABLE': True,
+  'EXTENSION': True,
+  'PYMODULE': True,
+  'PYSOURCE': True,
+  'PYZ': False,
+  'SPLASH': True},
+ [('PYZ-00.pyz',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\PYZ-00.pyz',
+   'PYZ'),
+  ('struct',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\localpycs\\struct.pyc',
+   'PYMODULE'),
+  ('pyimod01_archive',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\localpycs\\pyimod01_archive.pyc',
+   'PYMODULE'),
+  ('pyimod02_importers',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\localpycs\\pyimod02_importers.pyc',
+   'PYMODULE'),
+  ('pyimod03_ctypes',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\localpycs\\pyimod03_ctypes.pyc',
+   'PYMODULE'),
+  ('pyimod04_pywin32',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\localpycs\\pyimod04_pywin32.pyc',
+   'PYMODULE'),
+  ('pyiboot01_bootstrap',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
+   'PYSOURCE'),
+  ('pyi_rth_inspect',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
+   'PYSOURCE'),
+  ('pyi_rth_pkgutil',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
+   'PYSOURCE'),
+  ('pyi_rth_multiprocessing',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
+   'PYSOURCE'),
+  ('pyi_rth_setuptools',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_setuptools.py',
+   'PYSOURCE'),
+  ('pyi_rth_pkgres',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgres.py',
+   'PYSOURCE'),
+  ('pyi_rth_win32comgenpy',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_win32comgenpy.py',
+   'PYSOURCE'),
+  ('pyi_rth_pywintypes',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\hooks\\rthooks\\pyi_rth_pywintypes.py',
+   'PYSOURCE'),
+  ('pyi_rth_pythoncom',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\hooks\\rthooks\\pyi_rth_pythoncom.py',
+   'PYSOURCE'),
+  ('dashboard_viewer',
+   'C:\\Users\\Juan Pablo\\Desktop\\python\\garantia\\dashboard_viewer.py',
+   'PYSOURCE'),
+  ('VCRUNTIME140.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\VCRUNTIME140.dll',
+   'BINARY'),
+  ('python311.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\python311.dll',
+   'BINARY'),
+  ('clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+   'BINARY'),
+  ('clr_loader\\ffi\\dlls\\x86\\ClrLoader.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\x86\\ClrLoader.dll',
+   'BINARY'),
+  ('pywin32_system32\\pywintypes311.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\pywin32_system32\\pywintypes311.dll',
+   'BINARY'),
+  ('webview\\lib\\runtimes\\win-x64\\native\\WebView2Loader.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\runtimes\\win-x64\\native\\WebView2Loader.dll',
+   'BINARY'),
+  ('webview\\lib\\Microsoft.Web.WebView2.Core.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.Core.dll',
+   'BINARY'),
+  ('pywin32_system32\\pythoncom311.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\pywin32_system32\\pythoncom311.dll',
+   'BINARY'),
+  ('webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+   'BINARY'),
+  ('webview\\lib\\runtimes\\win-arm64\\native\\WebView2Loader.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\runtimes\\win-arm64\\native\\WebView2Loader.dll',
+   'BINARY'),
+  ('webview\\lib\\WebBrowserInterop.x64.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x64.dll',
+   'BINARY'),
+  ('webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\Python.Runtime.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\pythonnet\\runtime\\Python.Runtime.dll',
+   'BINARY'),
+  ('webview\\lib\\WebBrowserInterop.x86.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x86.dll',
+   'BINARY'),
+  ('win32\\win32trace.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\win32trace.pyd',
+   'EXTENSION'),
+  ('Pythonwin\\win32ui.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\Pythonwin\\win32ui.pyd',
+   'EXTENSION'),
+  ('_decimal.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_decimal.pyd',
+   'EXTENSION'),
+  ('_hashlib.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_hashlib.pyd',
+   'EXTENSION'),
+  ('select.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\select.pyd',
+   'EXTENSION'),
+  ('_socket.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_socket.pyd',
+   'EXTENSION'),
+  ('_lzma.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_lzma.pyd',
+   'EXTENSION'),
+  ('_bz2.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_bz2.pyd',
+   'EXTENSION'),
+  ('win32\\_win32sysloader.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\_win32sysloader.pyd',
+   'EXTENSION'),
+  ('win32\\win32api.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\win32api.pyd',
+   'EXTENSION'),
+  ('_ctypes.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_ctypes.pyd',
+   'EXTENSION'),
+  ('_overlapped.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_overlapped.pyd',
+   'EXTENSION'),
+  ('_ssl.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_ssl.pyd',
+   'EXTENSION'),
+  ('_queue.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_queue.pyd',
+   'EXTENSION'),
+  ('_multiprocessing.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_multiprocessing.pyd',
+   'EXTENSION'),
+  ('pyexpat.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\pyexpat.pyd',
+   'EXTENSION'),
+  ('_asyncio.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_asyncio.pyd',
+   'EXTENSION'),
+  ('markupsafe\\_speedups.cp311-win_amd64.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\markupsafe\\_speedups.cp311-win_amd64.pyd',
+   'EXTENSION'),
+  ('win32com\\shell\\shell.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32comext\\shell\\shell.pyd',
+   'EXTENSION'),
+  ('unicodedata.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\unicodedata.pyd',
+   'EXTENSION'),
+  ('_cffi_backend.cp311-win_amd64.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\_cffi_backend.cp311-win_amd64.pyd',
+   'EXTENSION'),
+  ('_elementtree.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_elementtree.pyd',
+   'EXTENSION'),
+  ('tornado\\speedups.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Roaming\\Python\\Python311\\site-packages\\tornado\\speedups.pyd',
+   'EXTENSION'),
+  ('win32\\win32evtlog.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\win32evtlog.pyd',
+   'EXTENSION'),
+  ('_uuid.pyd',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\_uuid.pyd',
+   'EXTENSION'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\VCRUNTIME140_1.dll',
+   'BINARY'),
+  ('Pythonwin\\mfc140u.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\Pythonwin\\mfc140u.dll',
+   'BINARY'),
+  ('libcrypto-1_1.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\libcrypto-1_1.dll',
+   'BINARY'),
+  ('libffi-8.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\libffi-8.dll',
+   'BINARY'),
+  ('libssl-1_1.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\DLLs\\libssl-1_1.dll',
+   'BINARY'),
+  ('python3.dll',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\python3.dll',
+   'BINARY'),
+  ('base_library.zip',
+   'C:\\Users\\Juan '
+   'Pablo\\Desktop\\python\\garantia\\build\\dashboard_viewer\\base_library.zip',
+   'DATA'),
+  ('webview\\js\\api.js',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\js\\api.js',
+   'DATA'),
+  ('webview\\js\\customize.js',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\js\\customize.js',
+   'DATA'),
+  ('webview\\js\\lib\\polyfill.js',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\js\\lib\\polyfill.js',
+   'DATA'),
+  ('webview\\js\\lib\\dom_json.js',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\js\\lib\\dom_json.js',
+   'DATA'),
+  ('webview\\js\\state.js',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\js\\state.js',
+   'DATA'),
+  ('webview\\js\\finish.js',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\js\\finish.js',
+   'DATA'),
+  ('webview\\lib\\pywebview-android.jar',
+   'C:\\Users\\Juan '
+   'Pablo\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\webview\\lib\\pywebview-android.jar',
+   'DATA'),
+  ('MarkupSafe-3.0.2.dist-info\\top_level.txt',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\MarkupSafe-3.0.2.dist-info\\top_level.txt',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\INSTALLER',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\INSTALLER',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\REQUESTED',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\REQUESTED',
+   'DATA'),
+  ('MarkupSafe-3.0.2.dist-info\\INSTALLER',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\MarkupSafe-3.0.2.dist-info\\INSTALLER',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\top_level.txt',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\top_level.txt',
+   'DATA'),
+  ('MarkupSafe-3.0.2.dist-info\\LICENSE.txt',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\MarkupSafe-3.0.2.dist-info\\LICENSE.txt',
+   'DATA'),
+  ('MarkupSafe-3.0.2.dist-info\\WHEEL',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\MarkupSafe-3.0.2.dist-info\\WHEEL',
+   'DATA'),
+  ('MarkupSafe-3.0.2.dist-info\\METADATA',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\MarkupSafe-3.0.2.dist-info\\METADATA',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\entry_points.txt',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\entry_points.txt',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\RECORD',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\RECORD',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\LICENSE',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\LICENSE',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\METADATA',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\METADATA',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\WHEEL',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\setuptools-65.5.0.dist-info\\WHEEL',
+   'DATA'),
+  ('MarkupSafe-3.0.2.dist-info\\RECORD',
+   'c:\\users\\juan '
+   'pablo\\appdata\\local\\programs\\python\\python311\\lib\\site-packages\\MarkupSafe-3.0.2.dist-info\\RECORD',
+   'DATA')],
+ False,
+ False,
+ False,
+ [],
+ None,
+ None,
+ None)
