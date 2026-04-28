@@ -871,6 +871,16 @@ class MongoApp:
             "Sin material",
             "Material incorrecto",
             "Vale sin firma/s",
+            "Diagnóstico insuficiente",
+            "Sin indicar TPI",
+            "Sin indicar trabajo realizado",
+            "Orden sin firma de cliente",
+            "Sin operaciones de mano de obra",
+            "Datos de cliente incompletos",
+            "Datos de vehículo incompletos",
+            "Form. de cortesía incorrecto/faltante",
+            "Factura de cortesía incompleta",
+            
         ]
 
         pad = {"padx": 16, "pady": (6, 0)}
