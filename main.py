@@ -1547,10 +1547,11 @@ class MongoApp:
     # ──────────────────────────────────────────────
     def open_tasks_viewer(self):
         from bson import ObjectId
+        from tkcalendar import DateEntry
 
-        COLS    = ("orden", "descripcion", "cierre", "reclamado", "contrato_pendiente", "observacion", "estado")
-        HEADERS = ("Orden", "Descripción", "Cierre", "Reclamado", "Contrato pend.", "Observación", "Estado")
-        COL_W   = (95, 190, 88, 88, 95, 180, 88)
+        COLS    = ("orden", "descripcion", "cierre", "reclamado", "contrato_pendiente", "observacion", "estado", "orden_recibida")
+        HEADERS = ("Orden", "Descripción", "Cierre", "Reclamado", "Contrato pend.", "Observación", "Estado", "Orden recibida")
+        COL_W   = (95, 190, 88, 88, 95, 180, 88, 105)
 
         def _fmt_date(val):
             if val and hasattr(val, "strftime"):
@@ -1577,9 +1578,10 @@ class MongoApp:
                 return ["15" + orden[2:], "5" + orden[2:]]
             return [orden]
 
-        def _row_values(doc, acred_values: set):
+        def _row_values(doc, acred_values: set, order_values: set):
             orden = doc.get("orden", "")
-            acreditado = any(k in acred_values for k in _acred_keys(orden)) if orden else False
+            acreditado    = any(k in acred_values for k in _acred_keys(orden)) if orden else False
+            orden_recibida = orden in order_values if orden else False
             return (
                 orden,
                 doc.get("descripcion", ""),
@@ -1588,6 +1590,7 @@ class MongoApp:
                 "Sí" if doc.get("contrato_pendiente") else "No",
                 doc.get("observacion", ""),
                 "Acreditado" if acreditado else "Pendiente",
+                "Sí" if orden_recibida else "No",
             )
 
         # ── Ventana principal ──────────────────────────────────────────────
@@ -1624,8 +1627,8 @@ class MongoApp:
         _debounce = [None]
 
         # Texto: columnas sin rango de fecha
-        TEXT_COLS = ("orden", "descripcion", "contrato_pendiente", "observacion", "estado")
-        TEXT_HDRS = ("Orden", "Descripción", "Contrato pend.", "Observación", "Estado")
+        TEXT_COLS = ("orden", "descripcion", "contrato_pendiente", "observacion", "estado", "orden_recibida")
+        TEXT_HDRS = ("Orden", "Descripción", "Contrato pend.", "Observación", "Estado", "Orden recibida")
         for i, (col, hdr) in enumerate(zip(TEXT_COLS, TEXT_HDRS)):
             tk.Label(filter_frame, text=hdr, font=("Arial", 7, "bold"),
                      bg="#f5f5f5", fg="#555555").grid(row=0, column=i, padx=3, sticky="w")
@@ -1682,8 +1685,10 @@ class MongoApp:
         for col, hdr in zip(COLS, HEADERS):
             tree.heading(col, text=hdr)
             tree.column(col, width=COL_W[COLS.index(col)], minwidth=50)
-        tree.tag_configure("acreditado", foreground="#1b5e20")
-        tree.tag_configure("pendiente",  foreground="#e65100")
+        tree.tag_configure("acreditado",       foreground="#1b5e20")
+        tree.tag_configure("pendiente",        foreground="#e65100")
+        tree.tag_configure("orden_si",         foreground="#283593")
+        tree.tag_configure("orden_no",         foreground="#888888")
 
         vsb = ttk.Scrollbar(tree_frame, orient="vertical",   command=tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
@@ -1722,7 +1727,8 @@ class MongoApp:
 
         # ── Lógica principal ───────────────────────────────────────────────
         all_rows: list[tuple] = []
-        _estado_idx = COLS.index("estado")
+        _estado_idx    = COLS.index("estado")
+        _orden_rec_idx = COLS.index("orden_recibida")
 
         _idx = {col: i for i, col in enumerate(COLS)}
 
@@ -1771,8 +1777,9 @@ class MongoApp:
                         break
                 if skip:
                     continue
-                tag = "acreditado" if vals[_estado_idx] == "Acreditado" else "pendiente"
-                tree.insert("", tk.END, iid=iid, values=vals, tags=(tag,))
+                estado_tag  = "acreditado" if vals[_estado_idx] == "Acreditado" else "pendiente"
+                orden_tag   = "orden_si" if vals[_orden_rec_idx] == "Sí" else "orden_no"
+                tree.insert("", tk.END, iid=iid, values=vals, tags=(estado_tag, orden_tag))
                 shown += 1
             total = len(all_rows)
             count_text = f"{shown} / {total} tarea{'s' if total != 1 else ''}"
@@ -1798,9 +1805,14 @@ class MongoApp:
                     for v in doc.values():
                         if isinstance(v, str):
                             acred_values.add(v)
+                order_values: set = set()
+                for doc in db[self.coll_1].find({}, {"_id": 0, "source": 0}):
+                    for v in doc.values():
+                        if isinstance(v, str):
+                            order_values.add(v)
                 docs = list(db[self.coll_6].find().sort("cierre", 1))
                 for doc in docs:
-                    all_rows.append((str(doc["_id"]), _row_values(doc, acred_values)))
+                    all_rows.append((str(doc["_id"]), _row_values(doc, acred_values, order_values)))
             except Exception as exc:
                 lbl_status.config(text=f"Error: {exc}")
                 return
@@ -1840,7 +1852,7 @@ class MongoApp:
                 notebook = ttk.Notebook(outer)
                 notebook.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0))
             else:
-                fwin.geometry("420x400")
+                fwin.geometry("420x430")
                 outer = tk.Frame(fwin)
                 outer.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
                 form_panel = outer
@@ -1854,19 +1866,31 @@ class MongoApp:
             ff.pack(fill=tk.X)
             ff.columnconfigure(1, weight=1)
 
-            def _lbl(text, row):
-                tk.Label(ff, text=text, font=("Arial", 9), anchor="w").grid(
-                    row=row, column=0, sticky="w", pady=3, padx=(0, 6))
+            def _lbl(text, row, required=False):
+                lbl_text = f"* {text}" if required else text
+                lbl_fg = "#c62828" if required else "black"
+                tk.Label(ff, text=lbl_text, font=("Arial", 9), anchor="w",
+                         fg=lbl_fg).grid(row=row, column=0, sticky="w", pady=3, padx=(0, 6))
 
             def _ent(row):
                 e = tk.Entry(ff, font=("Arial", 10), relief=tk.SOLID, bd=1)
                 e.grid(row=row, column=1, sticky="ew", pady=3)
                 return e
 
-            _lbl("Orden:",                  0); e_orden  = _ent(0)
-            _lbl("Descripción:",            1); e_desc   = _ent(1)
-            _lbl("Cierre (dd/mm/yyyy):",    2); e_cierre = _ent(2)
-            _lbl("Reclamado (dd/mm/yyyy):", 3); e_recl   = _ent(3)
+            def _date_entry(row):
+                de = DateEntry(ff, font=("Arial", 10), relief=tk.SOLID, bd=1,
+                               date_pattern="dd/mm/yyyy", locale="es_AR",
+                               background="#283593", foreground="white",
+                               headersbackground="#283593", headersforeground="white",
+                               selectbackground="#5c6bc0")
+                de.grid(row=row, column=1, sticky="ew", pady=3)
+                de.delete(0, tk.END)  # inicia vacío
+                return de
+
+            _lbl("Orden:",        0, required=True);  e_orden  = _ent(0)
+            _lbl("Descripción:",  1, required=True);  e_desc   = _ent(1)
+            _lbl("Cierre:",       2, required=True);  e_cierre = _date_entry(2)
+            _lbl("Reclamado:",    3);                 e_recl   = _date_entry(3)
             _lbl("Contrato pendiente:",     4)
             var_contrato = tk.BooleanVar()
             tk.Checkbutton(ff, variable=var_contrato).grid(row=4, column=1, sticky="w", pady=3)
@@ -1886,16 +1910,31 @@ class MongoApp:
 
             def _guardar():
                 lbl_err.config(text="")
+                orden_val = e_orden.get().strip()
+                desc_val  = e_desc.get().strip()
+                cierre_raw = e_cierre.get().strip()
+                if not orden_val:
+                    lbl_err.config(text="El campo Orden es obligatorio.")
+                    e_orden.focus()
+                    return
+                if not desc_val:
+                    lbl_err.config(text="El campo Descripción es obligatorio.")
+                    e_desc.focus()
+                    return
+                if not cierre_raw:
+                    lbl_err.config(text="El campo Cierre es obligatorio.")
+                    e_cierre.focus()
+                    return
                 try:
-                    cierre = _parse_date(e_cierre.get())
-                    recl   = _parse_date(e_recl.get())
+                    cierre = _parse_date(cierre_raw)
+                    recl   = _parse_date(e_recl.get().strip())
                 except ValueError as exc:
                     lbl_err.config(text=str(exc))
                     return
                 datos = {
                     "cierre":             cierre,
-                    "orden":              e_orden.get().strip(),
-                    "descripcion":        e_desc.get().strip(),
+                    "orden":              orden_val,
+                    "descripcion":        desc_val,
                     "reclamado":          recl,
                     "contrato_pendiente": var_contrato.get(),
                     "observacion":        e_obs.get("1.0", tk.END).strip(),
@@ -1918,10 +1957,18 @@ class MongoApp:
 
             # Pre-llenar campos si es edición
             if is_edit:
-                e_orden.insert(0,  doc.get("orden", ""))
-                e_desc.insert(0,   doc.get("descripcion", ""))
-                e_cierre.insert(0, _fmt_date(doc.get("cierre")))
-                e_recl.insert(0,   _fmt_date(doc.get("reclamado")))
+                e_orden.insert(0, doc.get("orden", ""))
+                e_desc.insert(0,  doc.get("descripcion", ""))
+                cierre_val = doc.get("cierre")
+                if cierre_val and hasattr(cierre_val, "strftime"):
+                    e_cierre.set_date(cierre_val)
+                else:
+                    e_cierre.delete(0, tk.END)
+                recl_val = doc.get("reclamado")
+                if recl_val and hasattr(recl_val, "strftime"):
+                    e_recl.set_date(recl_val)
+                else:
+                    e_recl.delete(0, tk.END)
                 var_contrato.set(doc.get("contrato_pendiente", False))
                 if doc.get("observacion"):
                     e_obs.insert("1.0", doc["observacion"])
