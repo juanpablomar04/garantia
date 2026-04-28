@@ -70,6 +70,7 @@ class MongoApp:
                 ("📝  Tareas",          self.open_tasks_viewer,                   "#e8eaf6", "#283593"),
                 ("✅  Acreditaciones",  lambda: self.open_acreditaciones_viewer(), "#e3f2fd", "#1565c0"),
                 ("⚠  Desvíos",         lambda: self.open_viewer(self.coll_4),     "#fff3e0", "#e65100"),
+                ("💳  Débitos",         self.open_debts_viewer,                   "#fce4ec", "#880e4f"),
             ]),
             ("Órdenes", [
                 ("📋  Órdenes",           lambda: self.open_viewer(self.coll_1), "#e3f2fd", "#1565c0"),
@@ -154,6 +155,7 @@ class MongoApp:
 
         edit_menu = tk.Menu(menubar, tearoff=0)
         edit_menu.add_command(label="Ingresar desvío", command=self.open_fault_form)
+        edit_menu.add_command(label="Ingresar débito", command=self.open_debt_form)
         edit_menu.add_separator()
         edit_menu.add_command(label="Generar QR piezas", command=self.open_qr_generator)
 
@@ -187,7 +189,8 @@ class MongoApp:
     # ──────────────────────────────────────────────
     #  VISOR UNIFICADO DE COLECCIONES
     # ──────────────────────────────────────────────
-    def open_viewer(self, collection_name, title=None, query=None):
+    def open_viewer(self, collection_name, title=None, query=None,
+                    exclude_cols=None, right_align_cols=None):
         try:
             db = self._get_db()
             coll = db[collection_name]
@@ -196,7 +199,8 @@ class MongoApp:
                 messagebox.showwarning("Sin datos", f"No hay registros en '{collection_name}'.")
                 return
 
-            exclude = {"_id", "source"}
+            exclude = {"_id", "source"} | (set(exclude_cols) if exclude_cols else set())
+            right_align = set(right_align_cols) if right_align_cols else set()
             columns = [k for k in raw_docs[0].keys() if k not in exclude]
             processed_data = [
                 [self._fmt_val(col, doc.get(col, "")) for col in columns]
@@ -345,6 +349,7 @@ class MongoApp:
 
             # ── Configurar columnas, filtros y ancho auto-ajustado ──
             CHAR_PX = 7
+            col_widths = {}
             for i, col in enumerate(columns):
                 header_text = col.replace("_", " ").upper()
                 col_w = max(
@@ -352,8 +357,10 @@ class MongoApp:
                     max((len(str(row[i])) * CHAR_PX + 20 for row in processed_data), default=50),
                     50,
                 )
+                col_widths[col] = col_w
                 tree.heading(col, text=header_text, command=lambda c=col: sort_by(c))
-                tree.column(col, width=col_w, minwidth=50, stretch=False)
+                anchor = "e" if col in right_align else "w"
+                tree.column(col, width=col_w, minwidth=50, stretch=True, anchor=anchor)
 
                 tk.Label(filter_frame, text=header_text, font=("Arial", 8, "bold")).grid(
                     row=0, column=i, padx=4, sticky="w"
@@ -364,6 +371,16 @@ class MongoApp:
                     row=1, column=i, padx=4, pady=2
                 )
                 filter_vars[col] = v
+
+            def _resize_columns(event=None):
+                total_natural = sum(col_widths.values())
+                available = tree.winfo_width() - 4
+                if available <= 0 or total_natural <= 0:
+                    return
+                for col, natural in col_widths.items():
+                    tree.column(col, width=max(int(available * natural / total_natural), 50))
+
+            tree.bind("<Configure>", _resize_columns)
 
             vsb.pack(side=tk.RIGHT, fill=tk.Y)
             hsb.pack(side=tk.BOTTOM, fill=tk.X)
@@ -380,6 +397,8 @@ class MongoApp:
             self.coll_5,
             title="Ver débitos (desde 2026)",
             query={"fecha": {"$gte": datetime(2026, 1, 1)}},
+            exclude_cols=["MO", "MO e", "MO_e", "Material", "Material e", "Material_e"],
+            right_align_cols=["Total"],
         )
 
     # ──────────────────────────────────────────────
@@ -941,7 +960,7 @@ class MongoApp:
         dec_frame.pack(fill=tk.X, padx=16, pady=(5, 0))
 
         decimal_vars: dict[str, tk.StringVar] = {}
-        decimal_fields = [("MO", "MO e"), ("Material", "Material e")]
+        decimal_fields = [("MO", "MO_e"), ("Material", "Material_e")]
 
         for row_idx, (left, right) in enumerate(decimal_fields):
             for col_idx, field in enumerate([left, right]):
@@ -990,7 +1009,7 @@ class MongoApp:
             if not any(v.get().strip() for v in decimal_vars.values()):
                 messagebox.showwarning(
                     "Campo requerido",
-                    "Ingresá al menos un valor decimal (MO, MO e, Material o Material e).",
+                    "Ingresá al menos un valor decimal (MO, MO_e, Material o Material_e).",
                     parent=win,
                 )
                 return
@@ -1006,9 +1025,9 @@ class MongoApp:
 
             try:
                 mo       = to_decimal128(decimal_vars["MO"].get())
-                mo_e     = to_decimal128(decimal_vars["MO e"].get())
+                mo_e     = to_decimal128(decimal_vars["MO_e"].get())
                 material = to_decimal128(decimal_vars["Material"].get())
-                mat_e    = to_decimal128(decimal_vars["Material e"].get())
+                mat_e    = to_decimal128(decimal_vars["Material_e"].get())
                 total    = Decimal128(str(
                     Decimal(mo.to_decimal()) +
                     Decimal(mo_e.to_decimal()) +
