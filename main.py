@@ -69,15 +69,15 @@ class MongoApp:
             ("Gestión", [
                 ("📝  Tareas",          self.open_tasks_viewer,                   "#e8eaf6", "#283593"),
                 ("✅  Acreditaciones",  lambda: self.open_acreditaciones_viewer(), "#e3f2fd", "#1565c0"),
-                ("⚠  Desvíos",         lambda: self.open_viewer(self.coll_4),     "#fff3e0", "#e65100"),
+                ("⚠  Desvíos",         lambda: self.open_viewer(self.coll_4, title="Desvíos"),     "#fff3e0", "#e65100"),
                 ("💳  Débitos",         self.open_debts_viewer,                   "#fce4ec", "#880e4f"),
             ]),
             ("Órdenes", [
-                ("📋  Órdenes",           lambda: self.open_viewer(self.coll_1), "#e3f2fd", "#1565c0"),
+                ("📋  Órdenes",           lambda: self.open_viewer(self.coll_1, title="Órdenes"), "#e3f2fd", "#1565c0"),
                 ("📷  Lector de órdenes", self.open_order_scanner,               "#e8f5e9", "#1b5e20"),
             ]),
             ("Piezas", [
-                ("🔩  Piezas",             lambda: self.open_viewer(self.coll_2), "#e3f2fd", "#1565c0"),
+                ("🔩  Piezas",             lambda: self.open_viewer(self.coll_2, title="Piezas"), "#e3f2fd", "#1565c0"),
                 ("🏷   Generar QR piezas", self.open_qr_generator,               "#fbe9e7", "#bf360c"),
                 ("📷  Lector de piezas",   self.open_parts_scanner,              "#e8f5e9", "#1b5e20"),
             ]),
@@ -145,11 +145,13 @@ class MongoApp:
         options_menu.add_command(label="2. Acreditaciones",
                                  command=lambda: self.open_acreditaciones_viewer())
         options_menu.add_command(label="3. Desvíos",
-                                 command=lambda: self.open_viewer(self.coll_4))
-        options_menu.add_command(label="4. Órdenes",
-                                 command=lambda: self.open_viewer(self.coll_1))
-        options_menu.add_command(label="5. Piezas",
-                                 command=lambda: self.open_viewer(self.coll_2))
+                                 command=lambda: self.open_viewer(self.coll_4, title="Desvíos"))
+        options_menu.add_command(label="4. Débitos",
+                                 command=self.open_debts_viewer)
+        options_menu.add_command(label="5. Órdenes",
+                                 command=lambda: self.open_viewer(self.coll_1, title="Órdenes"))
+        options_menu.add_command(label="6. Piezas",
+                                 command=lambda: self.open_viewer(self.coll_2, title="Piezas"))
         options_menu.add_separator()
         options_menu.add_command(label="Exit", command=self.root.quit)
 
@@ -262,14 +264,22 @@ class MongoApp:
             def sort_by(col):
                 asc = not _sort_state.get(col, True)
                 _sort_state[col] = asc
-                col_idx = columns.index(col)
 
                 def sort_key(iid):
                     val = tree.set(iid, col)
+                    # Fecha dd/mm/yyyy
                     try:
-                        return (0, float(val.replace(",", ".")))
+                        parts = val.split("/")
+                        if len(parts) == 3 and len(parts[2]) == 4:
+                            return (0, datetime(int(parts[2]), int(parts[1]), int(parts[0])))
                     except (ValueError, AttributeError):
-                        return (1, val.lower())
+                        pass
+                    # Número
+                    try:
+                        return (1, float(val.replace(",", ".")))
+                    except (ValueError, AttributeError):
+                        pass
+                    return (2, val.lower() if val else "")
 
                 items = sorted(tree.get_children(""), key=sort_key, reverse=not asc)
                 for i, iid in enumerate(items):
@@ -395,7 +405,7 @@ class MongoApp:
     def open_debts_viewer(self):
         self.open_viewer(
             self.coll_5,
-            title="Ver débitos (desde 2026)",
+            title="Débitos (desde 2026)",
             query={"fecha": {"$gte": datetime(2026, 1, 1)}},
             exclude_cols=["MO", "MO e", "MO_e", "Material", "Material e", "Material_e"],
             right_align_cols=["Total"],
@@ -546,15 +556,24 @@ class MongoApp:
             columns = _state["columns"]
             asc = not _sort_state.get(col, True)
             _sort_state[col] = asc
-            items = sorted(
-                tree.get_children(""),
-                key=lambda iid: (
-                    (0, float(tree.set(iid, col).replace(",", ".")))
-                    if tree.set(iid, col).replace(",", "").replace(".", "").lstrip("-").isdigit()
-                    else (1, tree.set(iid, col).lower())
-                ),
-                reverse=not asc,
-            )
+
+            def sort_key(iid):
+                val = tree.set(iid, col)
+                # Fecha dd/mm/yyyy
+                try:
+                    parts = val.split("/")
+                    if len(parts) == 3 and len(parts[2]) == 4:
+                        return (0, datetime(int(parts[2]), int(parts[1]), int(parts[0])))
+                except (ValueError, AttributeError):
+                    pass
+                # Número
+                try:
+                    return (1, float(val.replace(",", ".")))
+                except (ValueError, AttributeError):
+                    pass
+                return (2, val.lower() if val else "")
+
+            items = sorted(tree.get_children(""), key=sort_key, reverse=not asc)
             for i, iid in enumerate(items):
                 tree.move(iid, "", i)
             arrow = " ▲" if asc else " ▼"
@@ -860,9 +879,11 @@ class MongoApp:
     #  INGRESAR DESVÍO
     # ──────────────────────────────────────────────
     def open_fault_form(self):
+        from tkcalendar import DateEntry
+
         win = tk.Toplevel(self.root)
         win.title("Ingresar Desvío")
-        win.geometry("480x380")
+        win.geometry("480x430")
         win.resizable(False, False)
 
         DESVIOS = [
@@ -892,6 +913,11 @@ class MongoApp:
         orden_var = tk.StringVar()
         tk.Entry(win, textvariable=orden_var, font=("Arial", 11)).pack(fill=tk.X, padx=16, ipady=3)
 
+        tk.Label(win, text="Fecha *", font=("Arial", 10, "bold"), anchor="w").pack(fill=tk.X, **pad)
+        fecha_entry = DateEntry(win, font=("Arial", 11), date_pattern="dd/mm/yyyy",
+                                width=16, background="#1a6eb5", foreground="white", borderwidth=2)
+        fecha_entry.pack(fill=tk.X, padx=16, ipady=3)
+
         tk.Label(win, text="Desvío *", font=("Arial", 10, "bold"), anchor="w").pack(fill=tk.X, **pad)
         desvio_var = tk.StringVar(value=DESVIOS[0])
         ttk.Combobox(win, textvariable=desvio_var, values=DESVIOS, state="readonly",
@@ -912,15 +938,19 @@ class MongoApp:
             if not orden:
                 messagebox.showwarning("Campo requerido", "El campo Orden es obligatorio.", parent=win)
                 return
+            if not fecha_entry.get_date():
+                messagebox.showwarning("Campo requerido", "El campo Fecha es obligatorio.", parent=win)
+                return
             if not desvio:
                 messagebox.showwarning("Campo requerido", "Seleccioná un Desvío.", parent=win)
                 return
 
+            fecha_dt = datetime.combine(fecha_entry.get_date(), datetime.min.time())
             doc = {
                 "orden": orden,
                 "desvio": desvio,
                 "comentario": comentario,
-                "fecha": datetime.now(),
+                "fecha": fecha_dt,
             }
 
             try:
@@ -929,6 +959,7 @@ class MongoApp:
                 logger.info("Desvío guardado: orden=%s desvío=%s", orden, desvio)
                 lbl_feedback.config(text="✔ Desvío guardado correctamente.", fg="#2e7d32")
                 orden_var.set("")
+                fecha_entry.set_date(datetime.today())
                 desvio_var.set(DESVIOS[0])
                 comentario_txt.delete("1.0", tk.END)
             except Exception as e:
@@ -945,10 +976,11 @@ class MongoApp:
     def open_debt_form(self):
         from decimal import Decimal, InvalidOperation
         from bson.decimal128 import Decimal128
+        from tkcalendar import DateEntry
 
         win = tk.Toplevel(self.root)
         win.title("Ingresar Débito")
-        win.geometry("520x580")
+        win.geometry("520x635")
         win.resizable(False, False)
 
         pad = {"padx": 16, "pady": (5, 0)}
@@ -962,6 +994,11 @@ class MongoApp:
 
         make_label("Orden *")
         orden_var = make_entry(tk.StringVar())
+
+        make_label("Fecha *")
+        fecha_entry = DateEntry(win, font=("Arial", 11), date_pattern="dd/mm/yyyy",
+                                width=16, background="#1a6eb5", foreground="white", borderwidth=2)
+        fecha_entry.pack(fill=tk.X, padx=16, ipady=2)
 
         make_label("Reparación")
         reparacion_var = make_entry(tk.StringVar())
@@ -1019,6 +1056,9 @@ class MongoApp:
             if not orden:
                 messagebox.showwarning("Campo requerido", "El campo Orden es obligatorio.", parent=win)
                 return
+            if not fecha_entry.get_date():
+                messagebox.showwarning("Campo requerido", "El campo Fecha es obligatorio.", parent=win)
+                return
             if not any(v.get().strip() for v in decimal_vars.values()):
                 messagebox.showwarning(
                     "Campo requerido",
@@ -1047,9 +1087,10 @@ class MongoApp:
                     Decimal(material.to_decimal()) +
                     Decimal(mat_e.to_decimal())
                 ))
+                fecha_dt = datetime.combine(fecha_entry.get_date(), datetime.min.time())
                 doc = {
                     "orden":       orden,
-                    "fecha":       datetime.now(),
+                    "fecha":       fecha_dt,
                     "reparacion":  reparacion_var.get().strip(),
                     "motivo":      motivo_var.get().strip(),
                     "MO":          mo,
@@ -1069,6 +1110,7 @@ class MongoApp:
                 logger.info("Débito guardado: orden=%s total=%s", orden, total)
                 lbl_feedback.config(text="✔ Débito guardado correctamente.", fg="#2e7d32")
                 orden_var.set("")
+                fecha_entry.set_date(datetime.today())
                 reparacion_var.set("")
                 motivo_var.set("")
                 for v in decimal_vars.values():
@@ -1721,9 +1763,40 @@ class MongoApp:
         tree_frame = tk.Frame(win)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(4, 0))
 
+        _sort_state = {"col": None, "asc": True}
+        DATE_COLS = {"cierre", "reclamado"}
+
+        def _sort_key(val, col):
+            s = str(val)
+            if col in DATE_COLS:
+                try:
+                    return (0, _parse_date(s) or datetime.min)
+                except ValueError:
+                    return (1, datetime.min)
+            return (0, s.lower())
+
+        def _sort_by(col):
+            if _sort_state["col"] == col:
+                _sort_state["asc"] = not _sort_state["asc"]
+            else:
+                _sort_state["col"] = col
+                _sort_state["asc"] = True
+            _refresh_headings()
+            _apply_filters()
+
+        def _refresh_headings():
+            col_s = _sort_state["col"]
+            asc   = _sort_state["asc"]
+            for c, h in zip(COLS, HEADERS):
+                if c == col_s:
+                    arrow = " ▲" if asc else " ▼"
+                else:
+                    arrow = ""
+                tree.heading(c, text=h + arrow, command=lambda _c=c: _sort_by(_c))
+
         tree = ttk.Treeview(tree_frame, columns=COLS, show="headings", selectmode="extended")
         for col, hdr in zip(COLS, HEADERS):
-            tree.heading(col, text=hdr)
+            tree.heading(col, text=hdr, command=lambda _c=col: _sort_by(_c))
             tree.column(col, width=COL_W[COLS.index(col)], minwidth=50)
         tree.tag_configure("acreditado",       foreground="#1b5e20")
         tree.tag_configure("pendiente",        foreground="#e65100")
@@ -1787,9 +1860,7 @@ class MongoApp:
                     h = None
                 date_ranges[field] = (d, h)
 
-            for iid in tree.get_children():
-                tree.delete(iid)
-            shown = 0
+            filtered = []
             for iid, vals in all_rows:
                 # Filtros de texto
                 if any(terms[col] and terms[col] not in str(vals[_idx[col]]).lower()
@@ -1817,10 +1888,24 @@ class MongoApp:
                         break
                 if skip:
                     continue
-                estado_tag  = "acreditado" if vals[_estado_idx] == "Acreditado" else "pendiente"
-                orden_tag   = "orden_si" if vals[_orden_rec_idx] == "Sí" else "orden_no"
+                filtered.append((iid, vals))
+
+            # Ordenamiento
+            sort_col = _sort_state["col"]
+            if sort_col:
+                col_i = _idx[sort_col]
+                filtered.sort(
+                    key=lambda r: _sort_key(r[1][col_i], sort_col),
+                    reverse=not _sort_state["asc"],
+                )
+
+            for iid in tree.get_children():
+                tree.delete(iid)
+            for iid, vals in filtered:
+                estado_tag = "acreditado" if vals[_estado_idx] == "Acreditado" else "pendiente"
+                orden_tag  = "orden_si"   if vals[_orden_rec_idx] == "Sí"       else "orden_no"
                 tree.insert("", tk.END, iid=iid, values=vals, tags=(estado_tag, orden_tag))
-                shown += 1
+            shown = len(filtered)
             total = len(all_rows)
             count_text = f"{shown} / {total} tarea{'s' if total != 1 else ''}"
             lbl_count.config(text=count_text)
