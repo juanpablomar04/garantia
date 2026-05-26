@@ -904,6 +904,9 @@ class MongoApp:
             "Datos de vehículo incompletos",
             "Form. de cortesía incorrecto/faltante",
             "Factura de cortesía incompleta",
+            "Reparación no indica tarea realizada",
+            "Error de servicio",
+            "Reparación no realizada según manual de reparaciones"
             
         ]
 
