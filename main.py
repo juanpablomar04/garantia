@@ -1655,17 +1655,24 @@ class MongoApp:
             raise ValueError(f"Fecha inválida: '{s}'. Usá dd/mm/yyyy")
 
         def _acred_keys(orden):
+            keys = [orden]  # siempre incluir el número original
+            sufijo = orden[2:]  # últimos 5 dígitos
             if orden.startswith("20"):
-                return ["2" + orden[2:]]
-            if orden.startswith("60"):
-                return ["26" + orden[2:]]
-            if orden.startswith("50"):
-                return ["15" + orden[2:], "5" + orden[2:]]
-            return [orden]
+                keys.append("02" + sufijo)   # 20XXXXX → 02XXXXX
+            elif orden.startswith("50"):
+                keys.append("15" + sufijo)   # 50XXXXX → 15XXXXX
+                keys.append("05" + sufijo)   # 50XXXXX → 05XXXXX
+            elif orden.startswith("60"):
+                keys.append("26" + sufijo)   # 60XXXXX → 26XXXXX
+            return keys
 
         def _row_values(doc, acred_values: set, order_values: set):
             orden = doc.get("orden", "")
-            acreditado    = any(k in acred_values for k in _acred_keys(orden)) if orden else False
+            # Buscar substring: el número de orden puede estar embebido en un campo más largo
+            acreditado = any(
+                any(k in v for v in acred_values)
+                for k in _acred_keys(orden)
+            ) if orden else False
             orden_recibida = orden in order_values if orden else False
             return (
                 orden,
