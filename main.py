@@ -69,7 +69,7 @@ class MongoApp:
             ("Gestión", [
                 ("📝  Tareas",          self.open_tasks_viewer,                   "#e8eaf6", "#283593"),
                 ("✅  Acreditaciones",  lambda: self.open_acreditaciones_viewer(), "#e3f2fd", "#1565c0"),
-                ("⚠  Desvíos",         lambda: self.open_viewer(self.coll_4, title="Desvíos"),     "#fff3e0", "#e65100"),
+                ("⚠  Desvíos",         lambda: self.open_viewer(self.coll_4, title="Desvíos", default_sort="fecha", default_sort_asc=False),     "#fff3e0", "#e65100"),
                 ("💳  Débitos",         self.open_debts_viewer,                   "#fce4ec", "#880e4f"),
             ]),
             ("Órdenes", [
@@ -145,7 +145,7 @@ class MongoApp:
         options_menu.add_command(label="2. Acreditaciones",
                                  command=lambda: self.open_acreditaciones_viewer())
         options_menu.add_command(label="3. Desvíos",
-                                 command=lambda: self.open_viewer(self.coll_4, title="Desvíos"))
+                                 command=lambda: self.open_viewer(self.coll_4, title="Desvíos", default_sort="fecha", default_sort_asc=False))
         options_menu.add_command(label="4. Débitos",
                                  command=self.open_debts_viewer)
         options_menu.add_command(label="5. Órdenes",
@@ -192,7 +192,7 @@ class MongoApp:
     #  VISOR UNIFICADO DE COLECCIONES
     # ──────────────────────────────────────────────
     def open_viewer(self, collection_name, title=None, query=None,
-                    exclude_cols=None, right_align_cols=None):
+                    exclude_cols=None, right_align_cols=None, default_sort=None, default_sort_asc=True):
         try:
             db = self._get_db()
             coll = db[collection_name]
@@ -254,6 +254,12 @@ class MongoApp:
                         tree.insert("", tk.END, values=row)
                         shown += 1
                 lbl_count.config(text=f"{shown} / {len(processed_data)} registros")
+                # Aplicar ordenamiento por defecto si está definido y no hay sort manual activo
+                if default_sort and default_sort in columns and not any(_sort_state.values()):
+                    sort_by(default_sort)
+                    # sort_by togglea asc, así que si queremos desc volvemos a llamar
+                    if not default_sort_asc:
+                        sort_by(default_sort)
 
             def schedule_filter(*_):
                 if _debounce[0]:
@@ -409,6 +415,8 @@ class MongoApp:
             query={"fecha": {"$gte": datetime(2026, 1, 1)}},
             exclude_cols=["MO", "MO e", "MO_e", "Material", "Material e", "Material_e"],
             right_align_cols=["Total"],
+            default_sort="fecha",
+            default_sort_asc=False,
         )
 
     # ──────────────────────────────────────────────
@@ -898,9 +906,7 @@ class MongoApp:
             "Sin planilla de mantenimiento",
             "Sin indicar TPI",
             "Sin indicar trabajo realizado",
-            "Firma de cliente en orden faltante/incompleta",
-            "Comentario del cliente incorrecto",
-            "Reingreso faltante",
+            "Orden sin firma de cliente",
             "Sin operaciones de mano de obra",
             "Datos de cliente incompletos",
             "Datos de vehículo incompletos",
@@ -1657,24 +1663,17 @@ class MongoApp:
             raise ValueError(f"Fecha inválida: '{s}'. Usá dd/mm/yyyy")
 
         def _acred_keys(orden):
-            keys = [orden]  # siempre incluir el número original
-            sufijo = orden[2:]  # últimos 5 dígitos
             if orden.startswith("20"):
-                keys.append("02" + sufijo)   # 20XXXXX → 02XXXXX
-            elif orden.startswith("50"):
-                keys.append("15" + sufijo)   # 50XXXXX → 15XXXXX
-                keys.append("05" + sufijo)   # 50XXXXX → 05XXXXX
-            elif orden.startswith("60"):
-                keys.append("26" + sufijo)   # 60XXXXX → 26XXXXX
-            return keys
+                return ["2" + orden[2:]]
+            if orden.startswith("60"):
+                return ["26" + orden[2:]]
+            if orden.startswith("50"):
+                return ["15" + orden[2:], "5" + orden[2:]]
+            return [orden]
 
         def _row_values(doc, acred_values: set, order_values: set):
             orden = doc.get("orden", "")
-            # Buscar substring: el número de orden puede estar embebido en un campo más largo
-            acreditado = any(
-                any(k in v for v in acred_values)
-                for k in _acred_keys(orden)
-            ) if orden else False
+            acreditado    = any(k in acred_values for k in _acred_keys(orden)) if orden else False
             orden_recibida = orden in order_values if orden else False
             return (
                 orden,
