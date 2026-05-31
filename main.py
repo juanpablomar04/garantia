@@ -1673,8 +1673,8 @@ class MongoApp:
 
         def _row_values(doc, acred_values: set, order_values: set):
             orden = doc.get("orden", "")
-            acreditado    = any(k in acred_values for k in _acred_keys(orden)) if orden else False
-            orden_recibida = orden in order_values if orden else False
+            acreditado    = any(any(k.lower() in v for v in acred_values) for k in _acred_keys(orden)) if orden else False
+            orden_recibida = any(orden.lower() in v for v in order_values) if orden else False
             return (
                 orden,
                 doc.get("descripcion", ""),
@@ -1809,7 +1809,7 @@ class MongoApp:
         for col, hdr in zip(COLS, HEADERS):
             tree.heading(col, text=hdr, command=lambda _c=col: _sort_by(_c))
             tree.column(col, width=COL_W[COLS.index(col)], minwidth=50)
-        tree.tag_configure("acreditado",       foreground="#1b5e20")
+        tree.tag_configure("acreditado",       foreground="#00c853")
         tree.tag_configure("pendiente",        foreground="#e65100")
         tree.tag_configure("orden_si",         foreground="#283593")
         tree.tag_configure("orden_no",         foreground="#888888")
@@ -1939,13 +1939,13 @@ class MongoApp:
                 acred_values: set = set()
                 for doc in db[self.coll_3].find({}, {"_id": 0, "source": 0}):
                     for v in doc.values():
-                        if isinstance(v, str):
-                            acred_values.add(v)
+                        if v is not None and not isinstance(v, dict):
+                            acred_values.add(str(v).strip().lower())
                 order_values: set = set()
                 for doc in db[self.coll_1].find({}, {"_id": 0, "source": 0}):
                     for v in doc.values():
-                        if isinstance(v, str):
-                            order_values.add(v)
+                        if v is not None and not isinstance(v, dict):
+                            order_values.add(str(v).strip().lower())
                 docs = list(db[self.coll_6].find().sort("cierre", 1))
                 for doc in docs:
                     all_rows.append((str(doc["_id"]), _row_values(doc, acred_values, order_values)))
