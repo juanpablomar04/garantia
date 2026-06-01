@@ -1809,10 +1809,11 @@ class MongoApp:
         for col, hdr in zip(COLS, HEADERS):
             tree.heading(col, text=hdr, command=lambda _c=col: _sort_by(_c))
             tree.column(col, width=COL_W[COLS.index(col)], minwidth=50)
-        tree.tag_configure("acreditado",       foreground="#00c853")
-        tree.tag_configure("pendiente",        foreground="#e65100")
-        tree.tag_configure("orden_si",         foreground="#283593")
-        tree.tag_configure("orden_no",         foreground="#888888")
+        tree.tag_configure("acreditado",           foreground="#00c853")
+        tree.tag_configure("pendiente",            foreground="#e65100")
+        tree.tag_configure("acreditado_con_orden", foreground="#1565c0", font=("Arial", 9, "bold"))
+        tree.tag_configure("orden_si",             foreground="#283593")
+        tree.tag_configure("orden_no",             foreground="#888888")
 
         vsb = ttk.Scrollbar(tree_frame, orient="vertical",   command=tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
@@ -1913,9 +1914,16 @@ class MongoApp:
             for iid in tree.get_children():
                 tree.delete(iid)
             for iid, vals in filtered:
-                estado_tag = "acreditado" if vals[_estado_idx] == "Acreditado" else "pendiente"
-                orden_tag  = "orden_si"   if vals[_orden_rec_idx] == "Sí"       else "orden_no"
-                tree.insert("", tk.END, iid=iid, values=vals, tags=(estado_tag, orden_tag))
+                es_acreditado = vals[_estado_idx]    == "Acreditado"
+                tiene_orden   = vals[_orden_rec_idx] == "Sí"
+                if es_acreditado and tiene_orden:
+                    tags = ("acreditado_con_orden",)
+                elif es_acreditado:
+                    tags = ("acreditado",)
+                else:
+                    orden_tag = "orden_si" if tiene_orden else "orden_no"
+                    tags = ("pendiente", orden_tag)
+                tree.insert("", tk.END, iid=iid, values=vals, tags=tags)
             shown = len(filtered)
             total = len(all_rows)
             count_text = f"{shown} / {total} tarea{'s' if total != 1 else ''}"
