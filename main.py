@@ -192,7 +192,8 @@ class MongoApp:
     #  VISOR UNIFICADO DE COLECCIONES
     # ──────────────────────────────────────────────
     def open_viewer(self, collection_name, title=None, query=None,
-                    exclude_cols=None, right_align_cols=None, default_sort=None, default_sort_asc=True):
+                    exclude_cols=None, right_align_cols=None, default_sort=None, default_sort_asc=True,
+                    numeric_cols=None):
         try:
             db = self._get_db()
             coll = db[collection_name]
@@ -203,9 +204,27 @@ class MongoApp:
 
             exclude = {"_id", "source"} | (set(exclude_cols) if exclude_cols else set())
             right_align = set(right_align_cols) if right_align_cols else set()
+            numeric_fmt = set(numeric_cols) if numeric_cols else set()
+
+            def _fmt_numeric(val):
+                """Formatea un número con separador de miles '.' y decimales ','."""
+                try:
+                    f = float(str(val).replace(",", "."))
+                    int_part = int(f)
+                    dec_part = round(abs(f) - abs(int_part), 2)
+                    int_str = f"{int_part:,}".replace(",", ".")
+                    dec_str = f"{dec_part:.2f}".split(".")[1]
+                    return f"{int_str},{dec_str}"
+                except (ValueError, TypeError):
+                    return str(val) if val is not None else ""
+
             columns = [k for k in raw_docs[0].keys() if k not in exclude]
             processed_data = [
-                [self._fmt_val(col, doc.get(col, "")) for col in columns]
+                [
+                    _fmt_numeric(doc.get(col, "")) if col in numeric_fmt
+                    else self._fmt_val(col, doc.get(col, ""))
+                    for col in columns
+                ]
                 for doc in raw_docs
             ]
 
@@ -280,9 +299,14 @@ class MongoApp:
                             return (0, datetime(int(parts[2]), int(parts[1]), int(parts[0])))
                     except (ValueError, AttributeError):
                         pass
-                    # Número
+                    # Número (soporta formato argentino "1.234,56" y estándar "1234.56")
                     try:
-                        return (1, float(val.replace(",", ".")))
+                        norm = val.replace(".", "").replace(",", ".")
+                        return (1, float(norm))
+                    except (ValueError, AttributeError):
+                        pass
+                    try:
+                        return (1, float(val))
                     except (ValueError, AttributeError):
                         pass
                     return (2, val.lower() if val else "")
@@ -415,6 +439,7 @@ class MongoApp:
             query={"fecha": {"$gte": datetime(2026, 1, 1)}},
             exclude_cols=["MO", "MO e", "MO_e", "Material", "Material e", "Material_e"],
             right_align_cols=["Total"],
+            numeric_cols=["Total"],
             default_sort="fecha",
             default_sort_asc=False,
         )
@@ -1642,9 +1667,9 @@ class MongoApp:
         from bson import ObjectId
         from tkcalendar import DateEntry
 
-        COLS    = ("orden", "descripcion", "cierre", "reclamado", "contrato_pendiente", "observacion", "estado", "orden_recibida")
-        HEADERS = ("Orden", "Descripción", "Cierre", "Reclamado", "Contrato pend.", "Observación", "Estado", "Orden recibida")
-        COL_W   = (95, 190, 88, 88, 95, 180, 88, 105)
+        COLS    = ("orden", "descripcion", "cierre", "reclamado", "contrato_pendiente", "estado", "orden_recibida", "observacion")
+        HEADERS = ("Orden", "Descripción", "Cierre", "Reclamado", "Contrato pend.", "Estado", "Orden recibida", "Observación")
+        COL_W   = (95, 190, 88, 88, 95, 88, 105, 180)
 
         def _fmt_date(val):
             if val and hasattr(val, "strftime"):
@@ -1681,9 +1706,9 @@ class MongoApp:
                 _fmt_date(doc.get("cierre")),
                 _fmt_date(doc.get("reclamado")),
                 "Sí" if doc.get("contrato_pendiente") else "No",
-                doc.get("observacion", ""),
                 "Acreditado" if acreditado else "Pendiente",
                 "Sí" if orden_recibida else "No",
+                doc.get("observacion", ""),
             )
 
         # ── Ventana principal ──────────────────────────────────────────────
