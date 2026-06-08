@@ -81,9 +81,8 @@ class MongoApp:
                 ("🏷   Generar QR piezas", self.open_qr_generator,               "#fbe9e7", "#bf360c"),
                 ("📷  Lector de piezas",   self.open_parts_scanner,              "#e8f5e9", "#1b5e20"),
             ]),
-            ("Consultas", [
-                ("🔍  Consulta por orden", self.open_order_query, "#f3e5f5", "#6a1b9a"),
-                ("📊  Dashboard",          self.open_dashboard,   "#fce4ec", "#880e4f"),
+            ("Visualización", [
+                ("📊  Gráficos",           self.open_dashboard,   "#fce4ec", "#880e4f", tk.NORMAL),
             ]),
         ]
 
@@ -92,11 +91,14 @@ class MongoApp:
                                 font=("Arial", 9, "bold"), bg="#ffffff",
                                 fg="#555555", padx=12, pady=10)
             sec.pack(padx=24, pady=(0, 10), fill=tk.X)
-            for label, cmd, bg, fg in buttons:
+            for item in buttons:
+                label, cmd, bg, fg = item[0], item[1], item[2], item[3]
+                state = item[4] if len(item) > 4 else tk.NORMAL
                 btn = tk.Button(sec, text=label, command=cmd,
                                 font=("Arial", 10), bg=bg, fg=fg,
                                 relief=tk.FLAT, width=20, pady=14,
-                                cursor="hand2", activebackground=bg)
+                                cursor="hand2" if state == tk.NORMAL else "arrow",
+                                activebackground=bg, state=state)
                 btn.pack(side=tk.LEFT, padx=8)
 
     # ──────────────────────────────────────────────
@@ -162,12 +164,11 @@ class MongoApp:
         edit_menu.add_command(label="Generar QR piezas", command=self.open_qr_generator)
 
         queries_menu = tk.Menu(menubar, tearoff=0)
-        queries_menu.add_command(label="Consulta por orden", command=self.open_order_query)
-        queries_menu.add_command(label="Dashboard", command=self.open_dashboard)
+        queries_menu.add_command(label="Gráficos", command=self.open_dashboard)
 
         menubar.add_cascade(label="Inicio", menu=options_menu)
         menubar.add_cascade(label="Editar", menu=edit_menu)
-        menubar.add_cascade(label="Consultas", menu=queries_menu)
+        menubar.add_cascade(label="Visualización", menu=queries_menu)
 
         self.root.config(menu=menubar)
 
