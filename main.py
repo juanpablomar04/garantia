@@ -856,9 +856,9 @@ class MongoApp:
                 query_faults = _build_query(coll_faults, numero_orden)
 
                 # Transformación de prefijo para búsqueda en claims:
-                # 20xxxxx → 2xxxxx  |  60xxxxx → 26xxxxx  |  50xxxxx → 15xxxxx y 5xxxxx
+                # 20xxxxx → 02xxxxx  |  60xxxxx → 26xxxxx  |  50xxxxx → 15xxxxx y 5xxxxx
                 if numero_orden.startswith("20"):
-                    numero_claims = "2" + numero_orden[2:]
+                    numero_claims = "02" + numero_orden[2:]
                 elif numero_orden.startswith("60"):
                     numero_claims = "26" + numero_orden[2:]
                 elif numero_orden.startswith("50"):
@@ -1690,7 +1690,7 @@ class MongoApp:
 
         def _acred_keys(orden):
             if orden.startswith("20"):
-                return ["2" + orden[2:]]
+                return ["02" + orden[2:]]
             if orden.startswith("60"):
                 return ["26" + orden[2:]]
             if orden.startswith("50"):
@@ -1971,10 +1971,10 @@ class MongoApp:
             try:
                 db = self._get_db()
                 acred_values: set = set()
-                for doc in db[self.coll_3].find({}, {"_id": 0, "source": 0}):
-                    for v in doc.values():
-                        if v is not None and not isinstance(v, dict):
-                            acred_values.add(str(v).strip().lower())
+                for doc in db[self.coll_3].find({}, {"_id": 0, "Claim": 1}):
+                    v = doc.get("Claim")
+                    if v is not None and not isinstance(v, dict):
+                        acred_values.add(str(v).strip().lower())
                 order_values: set = set()
                 for doc in db[self.coll_1].find({}, {"_id": 0, "source": 0}):
                     for v in doc.values():
