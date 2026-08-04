@@ -7,3 +7,4 @@ app.log
 build/
 dist/
 Garantia.spec
+venv/
